@@ -1,0 +1,172 @@
+name: oncogon-osiel
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        NEXT_PUBLIC_OSIEL_API_URL: ${NEXT_PUBLIC_OSIEL_API_URL:-http://localhost:8000}
+    environment:
+      NEXT_PUBLIC_OSIEL_API_URL: ${NEXT_PUBLIC_OSIEL_API_URL:-http://localhost:8000}
+    ports:
+      - "${OSIEL_WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks: [osiel]
+
+  api:
+    build:
+      context: ./backend
+      args:
+        INSTALL_OPTIONAL_CONNECTORS: ${OSIEL_INSTALL_OPTIONAL_CONNECTORS:-true}
+    environment:
+      OSIEL_DATABASE_PATH: /app/data/osiel.db
+      OSIEL_OBJECT_STORE_PATH: /app/data/objects
+      OSIEL_CORS_ORIGINS: ${OSIEL_CORS_ORIGINS:-http://localhost:3000,http://localhost:4173}
+      OSIEL_DEMO_MODE: ${OSIEL_DEMO_MODE:-true}
+      OSIEL_API_KEY: ${OSIEL_API_KEY:-}
+      OSIEL_PUBLIC_CONNECTORS_ENABLED: ${OSIEL_PUBLIC_CONNECTORS_ENABLED:-false}
+      OSIEL_PUBLIC_CONNECTOR_TIMEOUT_SECONDS: ${OSIEL_PUBLIC_CONNECTOR_TIMEOUT_SECONDS:-12}
+      OSIEL_PUBLIC_CONNECTOR_USER_AGENT: ${OSIEL_PUBLIC_CONNECTOR_USER_AGENT:-Oncogon-OSIEL/0.2 research-use}
+      OSIEL_SOURCE_CONNECTORS_ENABLED: ${OSIEL_SOURCE_CONNECTORS_ENABLED:-false}
+      OSIEL_SOURCE_CONNECTOR_MAX_BYTES: ${OSIEL_SOURCE_CONNECTOR_MAX_BYTES:-100000000}
+      OSIEL_NCI60_BULK_URL: ${OSIEL_NCI60_BULK_URL:-}
+      OSIEL_NCI60_BULK_SHA256: ${OSIEL_NCI60_BULK_SHA256:-}
+      OSIEL_COCONUT_BULK_URL: ${OSIEL_COCONUT_BULK_URL:-}
+      OSIEL_COCONUT_BULK_SHA256: ${OSIEL_COCONUT_BULK_SHA256:-}
+      OSIEL_NPASS_BULK_URL: ${OSIEL_NPASS_BULK_URL:-}
+      OSIEL_NPASS_BULK_SHA256: ${OSIEL_NPASS_BULK_SHA256:-}
+      OSIEL_ANPDB_BULK_URL: ${OSIEL_ANPDB_BULK_URL:-}
+      OSIEL_ANPDB_BULK_SHA256: ${OSIEL_ANPDB_BULK_SHA256:-}
+      OSIEL_LOTUS_BULK_URL: ${OSIEL_LOTUS_BULK_URL:-}
+      OSIEL_LOTUS_BULK_SHA256: ${OSIEL_LOTUS_BULK_SHA256:-}
+      OSIEL_TOX21_BULK_URL: ${OSIEL_TOX21_BULK_URL:-}
+      OSIEL_TOX21_BULK_SHA256: ${OSIEL_TOX21_BULK_SHA256:-}
+      OSIEL_TOXCAST_BULK_URL: ${OSIEL_TOXCAST_BULK_URL:-}
+      OSIEL_TOXCAST_BULK_SHA256: ${OSIEL_TOXCAST_BULK_SHA256:-}
+      OSIEL_CHEMSPACE_API_BASE_URL: ${OSIEL_CHEMSPACE_API_BASE_URL:-https://api.chem-space.com}
+      OSIEL_CHEMSPACE_SEARCH_PATH: ${OSIEL_CHEMSPACE_SEARCH_PATH:-}
+      OSIEL_CHEMSPACE_API_KEY: ${OSIEL_CHEMSPACE_API_KEY:-}
+      OSIEL_VINA_ENABLED: ${OSIEL_VINA_ENABLED:-false}
+      OSIEL_VINA_MAX_CPU: ${OSIEL_VINA_MAX_CPU:-4}
+      OSIEL_VINA_MAX_TIMEOUT_SECONDS: ${OSIEL_VINA_MAX_TIMEOUT_SECONDS:-600}
+      OSIEL_OLLAMA_ENABLED: ${OSIEL_OLLAMA_ENABLED:-false}
+      OSIEL_OLLAMA_BASE_URL: ${OSIEL_OLLAMA_DOCKER_BASE_URL:-http://host.docker.internal:11434}
+      OSIEL_OLLAMA_MODEL: ${OSIEL_OLLAMA_MODEL:-qwen3:8b}
+      OSIEL_OLLAMA_EMBEDDING_MODEL: ${OSIEL_OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+      OSIEL_OLLAMA_TIMEOUT_SECONDS: ${OSIEL_OLLAMA_TIMEOUT_SECONDS:-120}
+      OSIEL_PROFESSOR_INGESTION_ENABLED: ${OSIEL_PROFESSOR_INGESTION_ENABLED:-false}
+      OSIEL_PROFESSOR_MAX_DOCUMENT_BYTES: ${OSIEL_PROFESSOR_MAX_DOCUMENT_BYTES:-20000000}
+      OSIEL_PROFESSOR_MAX_PAGES: ${OSIEL_PROFESSOR_MAX_PAGES:-500}
+      OSIEL_PROFESSOR_MAX_CHUNKS: ${OSIEL_PROFESSOR_MAX_CHUNKS:-2000}
+      OSIEL_PROFESSOR_RETRIEVAL_K: ${OSIEL_PROFESSOR_RETRIEVAL_K:-8}
+      OSIEL_PROFESSOR_RETENTION_DAYS: ${OSIEL_PROFESSOR_RETENTION_DAYS:-180}
+      OSIEL_ZINC22_ENABLED: ${OSIEL_ZINC22_ENABLED:-false}
+      OSIEL_ZINC22_BASE_URL: ${OSIEL_ZINC22_BASE_URL:-https://sw.docking.org}
+      OSIEL_ZINC22_MAP: ${OSIEL_ZINC22_MAP:-REALDB-2025-07.smi.anon}
+      OSIEL_ZINC22_TIMEOUT_SECONDS: ${OSIEL_ZINC22_TIMEOUT_SECONDS:-45}
+      OSIEL_ZINC22_MIN_POLL_SECONDS: ${OSIEL_ZINC22_MIN_POLL_SECONDS:-5}
+      OSIEL_MODEL_LAB_ENABLED: ${OSIEL_MODEL_LAB_ENABLED:-false}
+      OSIEL_MODEL_LAB_MAX_RECORDS: ${OSIEL_MODEL_LAB_MAX_RECORDS:-2000}
+      OSIEL_MODEL_LAB_MAX_CANDIDATES: ${OSIEL_MODEL_LAB_MAX_CANDIDATES:-500}
+      OSIEL_MULTIMODAL_ENABLED: ${OSIEL_MULTIMODAL_ENABLED:-false}
+      OSIEL_MULTIMODAL_TIMEOUT_SECONDS: ${OSIEL_MULTIMODAL_TIMEOUT_SECONDS:-90}
+      OSIEL_MULTIMODAL_MAX_RESPONSE_BYTES: ${OSIEL_MULTIMODAL_MAX_RESPONSE_BYTES:-1000000}
+      OSIEL_CHEM_MODEL_URL: ${OSIEL_CHEM_MODEL_URL:-}
+      OSIEL_CHEM_MODEL_NAME: ${OSIEL_CHEM_MODEL_NAME:-chemprop-dmpnn}
+      OSIEL_PROTEIN_MODEL_URL: ${OSIEL_PROTEIN_MODEL_URL:-}
+      OSIEL_PROTEIN_MODEL_NAME: ${OSIEL_PROTEIN_MODEL_NAME:-esm}
+      OSIEL_VISION_MODEL_URL: ${OSIEL_VISION_MODEL_URL:-}
+      OSIEL_VISION_MODEL_NAME: ${OSIEL_VISION_MODEL_NAME:-cellprofiler-adapter}
+      OSIEL_MULTIMODAL_API_TOKEN: ${OSIEL_MULTIMODAL_API_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${OSIEL_API_PORT:-8000}:8000"
+    volumes:
+      - osiel_api_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks: [osiel]
+
+  ollama:
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    profiles: ["ai"]
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - osiel_ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+    networks: [osiel]
+
+  ollama-models:
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    profiles: ["ai"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        ollama pull ${OSIEL_OLLAMA_MODEL:-qwen3:8b} &&
+        ollama pull ${OSIEL_OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+    restart: "no"
+    networks: [osiel]
+
+  postgres:
+    image: postgres:17
+    profiles: ["future-infra"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-oncogon}
+      POSTGRES_USER: ${POSTGRES_USER:-oncogon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - osiel_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oncogon} -d ${POSTGRES_DB:-oncogon}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [osiel]
+
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:latest}
+    profiles: ["future-infra"]
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-local-development-only}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-development-only-change-me}
+    volumes:
+      - osiel_object_store:/data
+    networks: [osiel]
+
+networks:
+  osiel:
+
+volumes:
+  osiel_api_data:
+  osiel_ollama:
+  osiel_postgres:
+  osiel_object_store:

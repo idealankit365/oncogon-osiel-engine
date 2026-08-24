@@ -1,0 +1,61 @@
+{
+  "report_version": "1.0",
+  "executed_at": "2026-08-22T04:29:32.673750+00:00",
+  "scenario": "official AutoDock Vina 1IEP example through OSIEL",
+  "job_id": "VIN-D0B184BBDCE2",
+  "status": "completed",
+  "engine_version": "1.2.7",
+  "duration_seconds": 81.2983,
+  "poses": [
+    {
+      "rank": 1,
+      "affinity_kcal_mol": -13.221,
+      "raw_energy_terms": [
+        -13.221,
+        -18.632,
+        -0.471,
+        5.41,
+        -0.471
+      ]
+    },
+    {
+      "rank": 2,
+      "affinity_kcal_mol": -11.256,
+      "raw_energy_terms": [
+        -11.256,
+        -15.37,
+        -0.963,
+        4.606,
+        -0.471
+      ]
+    },
+    {
+      "rank": 3,
+      "affinity_kcal_mol": -11.098,
+      "raw_energy_terms": [
+        -11.098,
+        -15.896,
+        -0.214,
+        4.541,
+        -0.471
+      ]
+    }
+  ],
+  "receptor_sha256": "761469710e3915b89b274483076dfe49754be7956661bc42f4cc36a182399d59",
+  "ligand_sha256": "37a20e58e77072c6b3ff07f285a345e647dd4e564af316a06e49518b15b7aa61",
+  "output_sha256": "ba06bbd95ca4275f1712d201c46b01c0041d12bfbbb1897deb036ebd3fb2132d",
+  "redocking_benchmark": {
+    "benchmark_id": "DBM-BDE63C4C5C2D",
+    "status": "passed",
+    "method": "atom-order-preserving heavy-atom Kabsch RMSD",
+    "threshold_angstrom": 2.0,
+    "best_pose_rank": 1,
+    "best_rmsd_angstrom": 0.8636,
+    "atom_type_order_match": true,
+    "scoring_qualified": false,
+    "reference_sha256": "37a20e58e77072c6b3ff07f285a345e647dd4e564af316a06e49518b15b7aa61",
+    "scientific_boundary": "A successful redocking RMSD checks pose-recovery for this prepared complex and search box. It does not validate affinity ranking, enrichment, cellular activity, safety or efficacy. A qualified protocol also needs multiple complexes, decoys, sensitivity analysis and review."
+  },
+  "scientific_boundary": "AutoDock Vina scores are approximate pose-ranking outputs in kcal/mol. They are not measured binding affinities, cellular activity, safety, efficacy, or clinical evidence. Interpretation requires receptor/ligand preparation review, redocking controls, sensitivity analysis, orthogonal computation, and experimental validation.",
+  "verified": true
+}

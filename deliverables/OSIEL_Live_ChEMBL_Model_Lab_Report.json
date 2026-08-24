@@ -1,0 +1,59 @@
+{
+  "report_version": "1.0",
+  "executed_at": "2026-08-22T21:08:43+05:30",
+  "execution": "real bounded ChEMBL retrieval plus local Python/RDKit/scikit-learn computation",
+  "task": {
+    "target_chembl_id": "CHEMBL203",
+    "target_label": "EGFR",
+    "endpoint": "IC50",
+    "assay_type": "B",
+    "source_record_ceiling": 1000,
+    "active_rule": "pChEMBL >= 6.0",
+    "inactive_rule": "pChEMBL <= 5.0",
+    "grey_zone": "removed"
+  },
+  "snapshot": {
+    "source_release": "ChEMBL_37",
+    "retained_unique_structures": 603,
+    "active": 497,
+    "inactive": 106,
+    "unique_scaffolds": 200,
+    "normalized_sha256": "1e0dde8727e0a3b58155ed82c1de1b3586bcfa5cc57f08b97dffefa9b308dd7b"
+  },
+  "model": {
+    "features": "Morgan ECFP4, 2048 bits, chirality enabled",
+    "estimator": "class-balanced logistic regression",
+    "calibration": "Platt scaling on separate scaffold calibration partition",
+    "split_counts": {
+      "train": 325,
+      "calibration": 121,
+      "frozen_test": 157
+    },
+    "scaffold_overlap_count": 0,
+    "metrics": {
+      "auroc": 0.9526,
+      "average_precision": 0.9948,
+      "balanced_accuracy": 0.7841,
+      "sensitivity": 0.9433,
+      "specificity": 0.625,
+      "brier_score": 0.0706,
+      "expected_calibration_error": 0.0771,
+      "test_prevalence": 0.8981,
+      "test_count": 157
+    },
+    "reference_engineering_gate": "passed",
+    "promotion_eligible": false
+  },
+  "active_learning": {
+    "proposed_compounds": 6,
+    "experiment_started": false,
+    "approval_required": true
+  },
+  "wet_lab_performed": false,
+  "scientific_interpretation": [
+    "The run proves that real public records were retrieved, normalized, split, trained and evaluated end to end.",
+    "The high internal scaffold-test metrics are not external or prospective validation and may reflect source, assay-series and selection biases.",
+    "No compound efficacy, safety, clinical benefit or Recursion-equivalent performance is established.",
+    "An independently locked dataset and prospective laboratory study are required before scientific promotion."
+  ]
+}

@@ -1,0 +1,7 @@
+plate_id,well,compound_id,concentration_um,replicate,raw_luminescence,control_type
+PLATE-001,A1,VEHICLE,0,1,100248,vehicle
+PLATE-001,A2,DOXORUBICIN,1,1,1002,positive
+PLATE-001,B1,CMP-CUR-0003,0.01,1,98224,sample
+PLATE-001,B2,CMP-CUR-0003,0.1,1,76542,sample
+PLATE-001,B3,CMP-CUR-0003,1,1,41021,sample
+PLATE-001,B4,CMP-CUR-0003,10,1,12003,sample

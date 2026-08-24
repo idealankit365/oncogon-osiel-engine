@@ -1,0 +1,47 @@
+{
+  "report_version": "1.0",
+  "executed_at": "2026-08-22T04:26:49.935126+00:00",
+  "scenario": "OSIEL Professor immutable ingestion, hybrid retrieval, answer persistence and faculty review",
+  "model_operator_enabled": false,
+  "generation_model": null,
+  "embedding_model": null,
+  "document": {
+    "id": "DOC-39D20384A559",
+    "status": "indexed",
+    "pages": 1,
+    "chunks": 1,
+    "raw_sha256": "a857dadb7474d546f5cebc9adede06c84190beb7a89ae02f7793f08866ffc1df",
+    "normalized_sha256": "dff0a37cf1f68eb21532ce1bb9f455a9dfb4aa538bb8a77bb04ca09c0be64509"
+  },
+  "answer": {
+    "id": "ANS-0EED5C8B81D9",
+    "conversation_id": "CON-20370903D2B9",
+    "mode": "deterministic-evidence",
+    "abstained": true,
+    "retrieval_score": 1.0,
+    "citation_coverage": 0.0,
+    "evidence_count": 6,
+    "trace_stages": [
+      "safety-boundary",
+      "registry-context",
+      "lexical-retrieval",
+      "dense-retrieval",
+      "hybrid-fusion",
+      "grounded-generation"
+    ]
+  },
+  "faculty_feedback": {
+    "id": "FBK-7A8EA61B5490",
+    "decision": "correct",
+    "training_applied": false
+  },
+  "adversarial_document": {
+    "status": "quarantined",
+    "flags": [
+      "ignore-prior-instructions:page-1",
+      "system-prompt-exfiltration:page-1"
+    ]
+  },
+  "verified": true,
+  "claim": "This software fixture verifies ingestion, retrieval, citation, persistence, feedback and quarantine controls. It is not experimental evidence or a biomedical accuracy validation."
+}

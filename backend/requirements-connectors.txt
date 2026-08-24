@@ -1,0 +1,2 @@
+# Optional source connector dependency. Core API/tests do not require this file.
+PyTDC==1.1.15

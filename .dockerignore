@@ -1,0 +1,14 @@
+.git
+.next
+.sites-runtime
+.wrangler
+backend/.venv
+backend/data
+node_modules
+dist
+outputs
+work
+*.log
+.env
+.env.local
+

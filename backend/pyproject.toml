@@ -1,0 +1,23 @@
+[project]
+name = "oncogon-osiel-engine"
+version = "0.1.0"
+description = "Research-use OSIEL compound prioritization and experimental learning engine"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.116.1",
+  "httpx==0.28.1",
+  "pydantic==2.13.4",
+  "pypdf==6.16.1",
+  "rdkit==2025.3.5",
+  "scikit-learn==1.8.0",
+  "uvicorn[standard]==0.35.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.4.1"]
+connectors = ["PyTDC==1.1.15"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

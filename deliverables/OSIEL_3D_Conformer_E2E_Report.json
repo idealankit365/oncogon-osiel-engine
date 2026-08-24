@@ -1,0 +1,101 @@
+{
+  "report_version": "1.0",
+  "executed_at": "2026-08-22T04:31:38.802512+00:00",
+  "scenario": "registered canonical SMILES to deterministic interactive 3D conformer",
+  "coordinate_method": "RDKit ETKDGv3",
+  "random_seed": 20260822,
+  "records": [
+    {
+      "compound_id": "CMP-CUR-0001",
+      "display_name": "Quercetin",
+      "optimization_method": "MMFF94",
+      "optimization_converged": true,
+      "energy_kcal_mol": 43.382726,
+      "atom_count": 32,
+      "heavy_atom_count": 22,
+      "sha256": "4c6ec8db192a88bac0ff4b3668666bad896cc2dc6dc9544fbf3d93a0a099250f",
+      "immutable_read_verified": true
+    },
+    {
+      "compound_id": "CMP-CUR-0002",
+      "display_name": "Luteolin",
+      "optimization_method": "MMFF94",
+      "optimization_converged": true,
+      "energy_kcal_mol": 28.706007,
+      "atom_count": 31,
+      "heavy_atom_count": 21,
+      "sha256": "f3213dac6d5e4a0d7757a3f1162b509bb1ba620d3f0e2f46f7db8c07ea694f38",
+      "immutable_read_verified": true
+    },
+    {
+      "compound_id": "CMP-CUR-0004",
+      "display_name": "Curcumin",
+      "optimization_method": "MMFF94",
+      "optimization_converged": true,
+      "energy_kcal_mol": 51.581696,
+      "atom_count": 47,
+      "heavy_atom_count": 27,
+      "sha256": "cad632c66257faf7fd20894d30325ddaf63931b7044959962abc7b223fe5780c",
+      "immutable_read_verified": true
+    },
+    {
+      "compound_id": "CMP-CUR-0006",
+      "display_name": "Catechin",
+      "optimization_method": "MMFF94",
+      "optimization_converged": true,
+      "energy_kcal_mol": 42.674349,
+      "atom_count": 35,
+      "heavy_atom_count": 21,
+      "sha256": "eabe0ef5dfed9fdcb83b5776bec8f5399f91d2b4df3c2d4665dee09fb7c2fed2",
+      "immutable_read_verified": true
+    },
+    {
+      "compound_id": "CMP-CUR-0012",
+      "display_name": "Gefitinib",
+      "optimization_method": "MMFF94",
+      "optimization_converged": true,
+      "energy_kcal_mol": 91.701922,
+      "atom_count": 55,
+      "heavy_atom_count": 31,
+      "sha256": "6c8bc3837d99b87b459e059e9e6a1034da8a95b57280370072df175f7dff7896",
+      "immutable_read_verified": true
+    },
+    {
+      "compound_id": "CMP-CUR-0010",
+      "display_name": "5-Fluorouracil",
+      "optimization_method": "MMFF94",
+      "optimization_converged": true,
+      "energy_kcal_mol": -65.18629,
+      "atom_count": 12,
+      "heavy_atom_count": 9,
+      "sha256": "e14db2945d7b24716f8120383d63caebb2ba5b5d54c1b6ed7c911e58c7a04c37",
+      "immutable_read_verified": true
+    },
+    {
+      "compound_id": "CMP-CUR-0005",
+      "display_name": "Resveratrol",
+      "optimization_method": "MMFF94",
+      "optimization_converged": true,
+      "energy_kcal_mol": 4.708635,
+      "atom_count": 29,
+      "heavy_atom_count": 17,
+      "sha256": "b606b08020fe28cfcf1565a5acb7f24728eb07306075b7920b465c63d4602b73",
+      "immutable_read_verified": true
+    },
+    {
+      "compound_id": "CMP-NCI-000012",
+      "display_name": "NCI Reference 0012",
+      "optimization_method": "MMFF94",
+      "optimization_converged": true,
+      "energy_kcal_mol": 41.127023,
+      "atom_count": 23,
+      "heavy_atom_count": 13,
+      "sha256": "156bc4acfd329f0a1ceb97842006ad2313ae7c35a30bc8941a06bee06c3185cf",
+      "immutable_read_verified": true
+    }
+  ],
+  "deterministic_repeat_verified": true,
+  "viewer": "3Dmol.js 2.5.5 with rotation, wheel/pinch zoom, camera controls, representations and colour schemes",
+  "verified": true,
+  "scientific_boundary": "Deterministic computational conformer for identity inspection only. It is not an experimental crystal structure, protein-bound pose, docking result or proof of activity."
+}

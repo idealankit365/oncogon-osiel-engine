@@ -1,0 +1,68 @@
+{
+  "scenario": "OSIEL identity-to-governance developer-reference run",
+  "research_use_only": true,
+  "health": {
+    "status": "healthy",
+    "service": "Oncogon AI OSIEL",
+    "demo_mode": true,
+    "compound_count": 192,
+    "timestamp": "2026-08-19T13:35:46.998488+00:00"
+  },
+  "candidate_count": 6,
+  "ranking_run_id": "RNK-8FD06923804E",
+  "policy_version": "natural-product-discovery-1.0.0",
+  "top_candidates": [
+    {
+      "rank": 1,
+      "compound_id": "CMP-CUR-0009",
+      "display_name": "Acetaminophen",
+      "score": 70.35,
+      "uncertainty": 0.1475,
+      "applicability_domain": "inside",
+      "predicted_ic50_um": 0.2797
+    },
+    {
+      "rank": 2,
+      "compound_id": "CMP-CUR-0003",
+      "display_name": "Apigenin",
+      "score": 69.57,
+      "uncertainty": 0.1513,
+      "applicability_domain": "inside",
+      "predicted_ic50_um": 0.3476
+    },
+    {
+      "rank": 3,
+      "compound_id": "CMP-CUR-0006",
+      "display_name": "Catechin",
+      "score": 67.91,
+      "uncertainty": 0.1297,
+      "applicability_domain": "inside",
+      "predicted_ic50_um": 0.3557
+    }
+  ],
+  "experiment_id": "EXP-64CD488D204D",
+  "result_id": "RES-FF9257454D59",
+  "simulation_only": true,
+  "synthetic_observations": 72,
+  "estimated_ic50_um": {
+    "CMP-CUR-0009": 0.2797,
+    "CMP-CUR-0003": 0.3476,
+    "CMP-CUR-0006": 0.3557
+  },
+  "qc_status": "passed",
+  "qc_checks": {
+    "replicate_consistency": true,
+    "viability_range": true,
+    "positive_control_present": true,
+    "negative_control_present": true,
+    "minimum_replicates": true
+  },
+  "training_eligibility_attempt": {
+    "http_status": 422,
+    "rejected": true,
+    "detail": "Simulation-only results can never become training eligible"
+  },
+  "champion_unchanged": true,
+  "audit_events_returned": 20,
+  "disclaimer": "Computational dry-run only. No physical assay, biological sample or wet-lab measurement was performed. These observations test software flow and must never be used as efficacy evidence."
+}
