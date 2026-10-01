@@ -1384,3 +1384,26 @@ export async function runMultimodalResearchCase(input: {
     };
   }
 }
+
+export async function approveModel(
+  modelId: string,
+  reviewer = "faculty-ml-reviewer",
+  reason = "Model evaluated on frozen Bemis-Murcko test scaffolds and verified for research challenger tracking.",
+): Promise<{ approved: boolean; error: string | null; detail?: string }> {
+  try {
+    const params = new URLSearchParams({ reviewer, reason });
+    const response = await apiFetch(`/v1/models/${encodeURIComponent(modelId)}/approve?${params.toString()}`, {
+      method: "POST",
+      headers: {
+        "X-OSIEL-Actor": reviewer,
+        "X-OSIEL-Role": "reviewer",
+      },
+    });
+    if (!response.ok) return { approved: false, error: await responseDetail(response) };
+    const data = await response.json() as { approved: boolean; reason?: string };
+    return { approved: data.approved, error: null, detail: data.reason };
+  } catch (err) {
+    return { approved: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+

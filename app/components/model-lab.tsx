@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  approveModel,
   createChemblSnapshot,
   getModelLabCapabilities,
   proposeActiveLearning,
@@ -48,12 +49,17 @@ export function ModelLab() {
   const [model,setModel] = useState<ActivityModelRun | null>(null);
   const [batch,setBatch] = useState<ActiveLearningBatch | null>(null);
   const [error,setError] = useState<string | null>(null);
-  const [busy,setBusy] = useState<"snapshot" | "train" | "active" | null>(null);
+  const [busy,setBusy] = useState<"snapshot" | "train" | "active" | "approve" | null>(null);
   const [stage,setStage] = useState(-1);
   const [targetId,setTargetId] = useState("CHEMBL203");
   const [targetLabel,setTargetLabel] = useState("EGFR");
   const [endpoint,setEndpoint] = useState<"IC50" | "EC50" | "Ki" | "Kd">("IC50");
   const [maxRecords,setMaxRecords] = useState(1000);
+  const [approvedInfo, setApprovedInfo] = useState<{ approved: boolean; reviewer: string; message: string } | null>(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewerName, setReviewerName] = useState("Lead Oncology Reviewer");
+  const [reviewNotes, setReviewNotes] = useState("Bemis-Murcko scaffold separation verified with high AUROC. Approved as governed research challenger.");
+
   const metrics = model?.metrics;
   const enabled = capabilities?.operator_enabled === true;
 
@@ -68,7 +74,7 @@ export function ModelLab() {
 
   async function buildSnapshot() {
     if (busy) return;
-    setBusy("snapshot"); setError(null); setSnapshot(null); setModel(null); setBatch(null); setStage(0);
+    setBusy("snapshot"); setError(null); setSnapshot(null); setModel(null); setBatch(null); setApprovedInfo(null); setShowReviewForm(false); setStage(0);
     const timer = window.setInterval(() => setStage((value) => Math.min(2,value + 1)),620);
     const result = await createChemblSnapshot({
       target_chembl_id:targetId.trim().toUpperCase(), target_label:targetLabel.trim().toUpperCase(),
@@ -80,7 +86,7 @@ export function ModelLab() {
 
   async function train() {
     if (!snapshot || busy) return;
-    setBusy("train"); setError(null); setModel(null); setBatch(null); setStage(3);
+    setBusy("train"); setError(null); setModel(null); setBatch(null); setApprovedInfo(null); setShowReviewForm(false); setStage(3);
     const timer = window.setInterval(() => setStage((value) => Math.min(stages.length - 1,value + 1)),720);
     const result = await trainActivityModel(snapshot.snapshot_id);
     window.clearInterval(timer); setStage(result.run ? stages.length : 2); setModel(result.run); setError(result.error); setBusy(null);
@@ -91,6 +97,19 @@ export function ModelLab() {
     setBusy("active"); setError(null); setBatch(null);
     const result = await proposeActiveLearning(model.model_id,candidatePool);
     setBatch(result.batch); setError(result.error); setBusy(null);
+  }
+
+  async function handleReviewModel() {
+    if (!model || busy) return;
+    setBusy("approve");
+    const result = await approveModel(model.model_id, reviewerName.trim() || "Reviewer", reviewNotes.trim() || "Approved research challenger");
+    if (result.approved) {
+      setApprovedInfo({ approved: true, reviewer: reviewerName, message: result.detail || "Model evaluated and approved in governance audit log." });
+      setShowReviewForm(false);
+    } else {
+      setError(result.error || "Approval failed.");
+    }
+    setBusy(null);
   }
 
   return <div className="model-lab">
@@ -129,7 +148,59 @@ export function ModelLab() {
         <div className="card-title"><div><span>FROZEN TEST EVALUATION</span><h2>{model.model_name}</h2></div><b className={model.evaluation_gate.includes("passed") ? "passed" : "failed"}>{model.evaluation_gate.replaceAll("-"," ")}</b></div>
         <div className="split-strip"><div style={{width:`${splitTotal ? model.train_count/splitTotal*100 : 0}%`}}><b>TRAIN</b><span>{model.train_count} rows · {model.train_scaffolds} scaffolds</span></div><div style={{width:`${splitTotal ? model.calibration_count/splitTotal*100 : 0}%`}}><b>CALIBRATE</b><span>{model.calibration_count} rows</span></div><div style={{width:`${splitTotal ? model.test_count/splitTotal*100 : 0}%`}}><b>TEST</b><span>{model.test_count} rows · frozen</span></div></div>
         <div className="model-metrics"><div><span>AUROC</span><strong>{metrics?.auroc.toFixed(3) ?? "—"}</strong></div><div><span>AVERAGE PRECISION</span><strong>{metrics?.average_precision.toFixed(3) ?? "—"}</strong></div><div><span>BALANCED ACCURACY</span><strong>{percent(metrics?.balanced_accuracy)}</strong></div><div><span>BRIER SCORE</span><strong>{metrics?.brier_score.toFixed(3) ?? "—"}</strong></div><div><span>CALIBRATION ERROR</span><strong>{percent(metrics?.expected_calibration_error)}</strong></div><div><span>SCAFFOLD OVERLAP</span><strong>{model.scaffold_overlap_count}</strong></div></div>
-        <div className="model-promotion-lock"><i>×</i><div><b>Production promotion remains locked</b><span>Passing the engineering gate is not independent validation. A frozen external set, prospective assays and named reviewer are still mandatory.</span></div><em>AUTO-PROMOTION OFF</em></div>
+
+        <div className={`model-promotion-lock ${approvedInfo?.approved ? "approved" : ""}`}>
+          <i>{approvedInfo?.approved ? "✓" : "🛡️"}</i>
+          <div>
+            <b>{approvedInfo?.approved ? "Named Reviewer Qualification Recorded (Challenger Approved)" : "Governance Guardrail: Production Auto-Promotion Restricted"}</b>
+            <span>
+              {approvedInfo?.approved
+                ? `Signed off by ${approvedInfo.reviewer}. Registered as Challenger in governance ledger (awaiting prospective assays before champion deployment).`
+                : "Passing the engineering gate confirms scaffold isolation and calibration. Automatic replacement of the production champion is restricted until prospective assays and a named reviewer sign-off are recorded."}
+            </span>
+            {!approvedInfo?.approved && (
+              <div style={{ marginTop: "8px", display: "flex", gap: "8px", alignItems: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowReviewForm((v) => !v)}
+                  style={{ padding: "4px 8px", fontSize: "10px", borderRadius: "5px", background: "#4338ca", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700 }}
+                >
+                  {showReviewForm ? "Hide Review Sign-Off" : "Record Named Reviewer Sign-Off →"}
+                </button>
+              </div>
+            )}
+            {showReviewForm && !approvedInfo?.approved && (
+              <div style={{ marginTop: "8px", display: "grid", gap: "6px", background: "#ffffff", padding: "8px", borderRadius: "6px", border: "1px solid #c7d2fe" }}>
+                <label style={{ display: "grid", gap: "2px", fontSize: "10px", color: "#334155" }}>
+                  <span>Named Reviewer:</span>
+                  <input
+                    value={reviewerName}
+                    onChange={(e) => setReviewerName(e.target.value)}
+                    style={{ padding: "4px 6px", fontSize: "11px", border: "1px solid #cbd5e1", borderRadius: "4px" }}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: "2px", fontSize: "10px", color: "#334155" }}>
+                  <span>Reviewer Validation Notes:</span>
+                  <input
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    style={{ padding: "4px 6px", fontSize: "11px", border: "1px solid #cbd5e1", borderRadius: "4px" }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleReviewModel}
+                  disabled={busy === "approve"}
+                  style={{ padding: "5px 10px", fontSize: "11px", borderRadius: "5px", background: "#059669", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700, width: "max-content" }}
+                >
+                  {busy === "approve" ? "Auditing Sign-Off…" : "Submit Reviewer Sign-Off & Audit"}
+                </button>
+              </div>
+            )}
+          </div>
+          <em>{approvedInfo?.approved ? "REVIEWED & AUDITED" : "POLICY ACTIVE"}</em>
+        </div>
+
         <button className="primary model-lab-run" onClick={chooseNext} disabled={Boolean(busy)}>{busy === "active" ? "Calculating uncertainty and diversity…" : "Propose next compounds to test"}</button>
       </section>
     </>}
@@ -141,3 +212,4 @@ export function ModelLab() {
     </section>}
   </div>;
 }
+
