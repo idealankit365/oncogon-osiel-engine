@@ -254,10 +254,31 @@ export function ExperimentLab({ candidates, selectedIds, onRunExperiment }: Prop
   const runSheet = { studyId:"OSIEL-A549-TEACHING-001", institutionProfile:institution, supervisor, researchQuestion:"Which prioritized candidates produce a reproducible A549 viability response under the locally approved assay SOP?", biologicalModel:"A549", assay:"CellTiter-Glo", plateFormat:"96-well", dataClass:"teaching simulation until measured instrument data is imported", readiness:readinessItems.map((item) => ({ item, confirmed:readiness.includes(item) })), sources:["NCATS Assay Guidance Manual","Promega CellTiter-Glo protocol","UCT research data management and biosafety guidance","Stellenbosch SunDMP guidance"] };
   const workflowCompound = candidates.find((item) => item.compound_id === (current?.compoundIds[0] ?? selectedCandidates[0]));
   const workflowExperimentId = current?.id ?? "NEW EXPERIMENT";
+
+  function navigateToWorkflowStep(targetTab: LabTab) {
+    setTab(targetTab);
+    setTimeout(() => {
+      const targetElement = document.getElementById("lab-workspace-content") || document.getElementById("lab-nav-bar");
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 50);
+  }
+
+  const isCardActive = (cardStep: string) => {
+    if (cardStep === "1" && tab === "study") return true;
+    if (cardStep === "2" && tab === "builder") return true;
+    if (cardStep === "3" && (tab === "live" || tab === "debugger")) return true;
+    if (cardStep === "4" && tab === "integrations") return true;
+    if (cardStep === "5" && tab === "review") return true;
+    if (cardStep === "6" && (tab === "results" || tab === "history" || tab === "structure")) return true;
+    return false;
+  };
+
   const workflowCards: Array<{ step:string; title:string; owner:string; badge:string; summary:string; rows:string[]; action:string; target:LabTab }> = [
-    { step:"1", title:"AI suggests a test", owner:"OSIEL AI", badge:"PREDICTION", summary:"Turn the selected candidate into a traceable experimental hypothesis.", rows:["Hypothesis and test rationale","Supporting evidence","Uncertainty and model context"], action:"Review experiment proposal", target:"builder" },
+    { step:"1", title:"AI suggests a test", owner:"OSIEL AI", badge:"PREDICTION", summary:"Turn the selected candidate into a traceable experimental hypothesis.", rows:["Hypothesis and test rationale","Supporting evidence","Uncertainty and model context"], action:"Review experiment proposal", target:"study" },
     { step:"2", title:"Researcher approves", owner:"Researcher", badge:"APPROVAL", summary:"Review protocol, controls and measurements before the experiment proceeds.", rows:["Protocol definition","Controls and dose plan","Acceptance rules"], action:"Open protocol builder", target:"builder" },
-    { step:"3", title:"Lab execution", owner:"Research team", badge:"EXECUTION", summary:"Track the approved workflow against the same Experiment ID.", rows:["Experiment progress","Sample and plate context","Instrument workflow"], action:"Open live run", target:"live" },
+    { step:"3", title:"Lab execution", owner:"Research team", badge:"EXECUTION", summary:"Track the approved workflow against the same Experiment ID.", rows:["Experiment progress","Sample and plate context","Instrument workflow"], action:running ? "View running simulation" : "Open live run", target:"live" },
     { step:"4", title:"Upload measured results", owner:"Lab assistant", badge:"MEASURED DATA", summary:"Bring instrument exports and supporting measurements into the governed record.", rows:["Instrument data import","Schema and QC validation","Source-file preservation"], action:"Open data integrations", target:"integrations" },
     { step:"5", title:"QC & scientific review", owner:"Researcher", badge:"REVIEW", summary:"Review quality controls, compare the result with the prediction context and record a decision.", rows:["Quality-control checks","Result interpretation","Approve, reject or repeat"], action:"Open scientific review", target:"review" },
     { step:"6", title:"Decide the next experiment", owner:"Researcher + OSIEL", badge:"NEXT ACTION", summary:"Keep the reviewed evidence linked to history and prepare the next governed run.", rows:["Preserve research history","Review next candidates","Create follow-up experiment"], action:"Review next action", target:"results" },
@@ -274,24 +295,56 @@ export function ExperimentLab({ candidates, selectedIds, onRunExperiment }: Prop
           <h2>AI prediction → Lab execution → Researcher review</h2>
           <p>One Experiment ID connects the hypothesis, approved protocol, experiment execution, measured evidence, quality review and the next research decision.</p>
         </div>
-        <div className="experiment-flow-context">
+        <button
+          type="button"
+          className="experiment-flow-context clickable"
+          onClick={() => navigateToWorkflowStep(current ? "results" : "builder")}
+          title="Click to view experiment details"
+        >
           <span>{workflowExperimentId}</span>
           <b>{workflowCompound?.display_name ?? title}</b>
           <small>{running ? "Experiment running" : current ? `${current.status} · ${current.reviewStatus} review` : "Ready for a new experiment"}</small>
-        </div>
+        </button>
       </div>
 
       <div className="experiment-flow-grid">
-        {workflowCards.map((card) => <article className="experiment-flow-card" key={card.step}>
-          <div className="experiment-flow-card-head">
-            <i>{card.step}</i>
-            <div><h3>{card.title}</h3><span>Owner: {card.owner}</span></div>
-            <em>{card.badge}</em>
-          </div>
-          <p>{card.summary}</p>
-          <ul>{card.rows.map((row) => <li key={row}><span>✓</span>{row}</li>)}</ul>
-          <button onClick={() => setTab(card.target)}>{card.action} →</button>
-        </article>)}
+        {workflowCards.map((card) => {
+          const active = isCardActive(card.step);
+          return (
+            <article
+              className={`experiment-flow-card ${active ? "active" : ""}`}
+              key={card.step}
+              role="button"
+              tabIndex={0}
+              onClick={() => navigateToWorkflowStep(card.target)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  navigateToWorkflowStep(card.target);
+                }
+              }}
+              title={`Open ${card.title} (${card.action})`}
+            >
+              <div className="experiment-flow-card-head">
+                <i>{card.step}</i>
+                <div><h3>{card.title}</h3><span>Owner: {card.owner}</span></div>
+                <em>{card.badge}</em>
+              </div>
+              <p>{card.summary}</p>
+              <ul>{card.rows.map((row) => <li key={row}><span>✓</span>{row}</li>)}</ul>
+              <button
+                type="button"
+                className="experiment-flow-card-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  navigateToWorkflowStep(card.target);
+                }}
+              >
+                {card.action} →
+              </button>
+            </article>
+          );
+        })}
       </div>
 
       <div className="experiment-flow-footer">
@@ -300,7 +353,8 @@ export function ExperimentLab({ candidates, selectedIds, onRunExperiment }: Prop
       </div>
     </section>
 
-    <div className="lab-nav">{(["study","builder","live","debugger","results","structure","history","review","integrations"] as LabTab[]).map((item,index) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}><span>{String(index + 1).padStart(2,"0")}</span>{item === "study" ? "University study" : item === "live" ? "Live run" : item === "debugger" ? "Experiment debugger" : item === "structure" ? "3D structure" : item[0].toUpperCase() + item.slice(1)}{(item === "live" || item === "debugger") && running && <i/>}</button>)}</div>
+    <div className="lab-nav" id="lab-nav-bar">{(["study","builder","live","debugger","results","structure","history","review","integrations"] as LabTab[]).map((item,index) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}><span>{String(index + 1).padStart(2,"0")}</span>{item === "study" ? "University study" : item === "live" ? "Live run" : item === "debugger" ? "Experiment debugger" : item === "structure" ? "3D structure" : item[0].toUpperCase() + item.slice(1)}{(item === "live" || item === "debugger") && running && <i/>}</button>)}</div>
+    <div id="lab-workspace-content" />
 
     {tab === "study" && <><section className="university-hero"><div><span>UNIVERSITY-READY TEACHING TEMPLATE</span><h2>Cape Town research workflow</h2><p>A549 viability study planning aligned to public UCT and Stellenbosch governance concepts and authoritative assay guidance.</p></div><b>{readinessPercent}% READY</b></section><div className="university-notice"><b>No university endorsement</b><span>This independent teaching reference is not affiliated with or endorsed by the University of Cape Town or Stellenbosch University. Your local committee, supervisor and SOP always control physical work.</span></div><div className="module-grid university-grid"><article className="module-card"><div className="card-title"><div><span>STUDY ID · OSIEL-A549-TEACHING-001</span><h2>Research definition</h2></div><b>RUO</b></div><label className="lab-field"><span>Institution profile</span><select value={institution} onChange={(event) => setInstitution(event.target.value)}><option>Independent South African university</option><option>UCT governance reference</option><option>Stellenbosch governance reference</option></select></label><label className="lab-field"><span>Named supervisor / PI</span><input value={supervisor} onChange={(event) => setSupervisor(event.target.value)} placeholder="Required before a physical run"/></label><dl className="spec-list"><div><dt>Research question</dt><dd>Which prioritized candidates produce a reproducible A549 viability response under the locally approved SOP?</dd></div><div><dt>Teaching model</dt><dd>A549 · CellTiter-Glo · 96-well</dd></div><div><dt>Software output</dt><dd>Simulation until measured instrument data is imported and approved</dd></div></dl><div className="export-actions"><button onClick={() => download("OSIEL-A549-teaching-run-sheet.json","application/json",JSON.stringify(runSheet,null,2))}>Download student run sheet</button><button className="primary" onClick={() => { setCellLine("A549"); setAssay("CellTiter-Glo"); setMode("nominal"); setTitle("Cape Town A549 teaching simulation"); setTab("builder"); }}>Prepare teaching simulation →</button></div></article><article className="module-card readiness-card"><div className="card-title"><div><span>STOP / GO GATE</span><h2>Institutional readiness</h2></div><b>{readiness.length}/{readinessItems.length}</b></div><div className="readiness-progress"><i style={{width:`${readinessPercent}%`}}/></div>{readinessItems.map((item) => <label key={item}><input type="checkbox" checked={readiness.includes(item)} onChange={() => setReadiness((items) => items.includes(item) ? items.filter((value) => value !== item) : [...items,item])}/><span>{item}</span></label>)}<div className={readinessPercent === 100 && supervisor.trim() ? "go-decision ready" : "go-decision blocked"}><b>{readinessPercent === 100 && supervisor.trim() ? "SOFTWARE GATE COMPLETE" : "PHYSICAL RUN BLOCKED"}</b><span>{readinessPercent === 100 && supervisor.trim() ? "Hand the plan to the named supervisor for the institution’s final authorization." : "Complete every item and name the responsible supervisor. This does not itself grant laboratory approval."}</span></div></article></div><article className="module-card protocol-roadmap"><div className="card-title"><div><span>GUIDED WORKFLOW</span><h2>From approved plan to governed evidence</h2></div><b>Follow local SOP for operational details</b></div><ol>{[["Plan and approve","Define the question, DMP, responsibilities and applicable institutional approvals."],["Verify materials","Record standardized compound identity, cell provenance, authentication and contamination status."],["Lock controls and layout","Predefine vehicle, positive and intermediate QC controls, replicates and acceptance rules."],["Execute approved local SOP","A trained researcher performs exposure and reagent handling under the institution’s authorized protocol."],["Capture raw signal","Preserve the plate-reader export and metadata before normalization or fitting."],["Validate and normalize","Check schema, controls, completeness and replicate consistency before interpreting response."],["Scientific review","A separate reviewer approves or rejects the measured record and documents deviations."],["Governed learning","Only approved measured rows enter an immutable challenger dataset; simulations remain excluded."]].map(([name,detail],index) => <li key={name}><i>{index+1}</i><span><b>{name}</b><small>{detail}</small></span></li>)}</ol></article><div className="study-sources">{[["NCATS cell viability guidance","https://www.ncbi.nlm.nih.gov/books/NBK144065/"],["Promega CellTiter-Glo protocol","https://www.promega.com/resources/protocols/technical-bulletins/0/celltiter-glo-luminescent-cell-viability-assay-protocol/"],["UCT research data management","https://lib.uct.ac.za/digitalservices/documentation/rdm-policy"],["UCT biosafety","https://uct.ac.za/research-support-hub/integrity/biosafety"],["Stellenbosch SunDMP guidance","https://blogs.sun.ac.za/libraryresearchnews/2025/06/03/what-to-consider-before-using-sus-sundmp/" ]].map(([label,url]) => <a key={url} href={url} target="_blank" rel="noreferrer">{label}<span>Authoritative source ↗</span></a>)}</div></>}
 

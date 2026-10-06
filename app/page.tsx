@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { demoCandidates } from "./lib/demo-data";
 import type { RankedCandidate } from "./lib/demo-data";
@@ -76,8 +76,80 @@ function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: str
   return <span className={`badge ${tone}`}>{children}</span>;
 }
 
+const navToHash: Record<string, string> = {
+  "Research cockpit": "cockpit",
+  "Open discovery": "open-discovery",
+  "Compound registry": "compound-registry",
+  "Evidence sources": "evidence-sources",
+  "Prediction studio": "prediction-studio",
+  "Model laboratory": "model-laboratory",
+  "Ranking policies": "ranking-policies",
+  "Multimodal engine": "multimodal-engine",
+  "Scientific copilot": "scientific-copilot",
+  "Experiments": "experiments",
+  "Model governance": "model-governance",
+  "Audit & lineage": "audit-lineage",
+  "Production center": "production-center",
+  "Recursion gap map": "recursion-gap-map",
+  "Settings": "settings",
+};
+
+const hashToNav: Record<string, string> = {
+  "experiments": "Experiments",
+  "experiment": "Experiments",
+  "cockpit": "Research cockpit",
+  "research-cockpit": "Research cockpit",
+  "open-discovery": "Open discovery",
+  "discovery": "Open discovery",
+  "compound-registry": "Compound registry",
+  "compounds": "Compound registry",
+  "evidence-sources": "Evidence sources",
+  "evidence": "Evidence sources",
+  "prediction-studio": "Prediction studio",
+  "prediction": "Prediction studio",
+  "model-laboratory": "Model laboratory",
+  "model-lab": "Model laboratory",
+  "ranking-policies": "Ranking policies",
+  "policies": "Ranking policies",
+  "multimodal-engine": "Multimodal engine",
+  "multimodal": "Multimodal engine",
+  "scientific-copilot": "Scientific copilot",
+  "copilot": "Scientific copilot",
+  "model-governance": "Model governance",
+  "governance": "Model governance",
+  "audit-lineage": "Audit & lineage",
+  "audit": "Audit & lineage",
+  "production-center": "Production center",
+  "production": "Production center",
+  "recursion-gap-map": "Recursion gap map",
+  "recursion": "Recursion gap map",
+  "settings": "Settings",
+};
+
 export default function Home() {
   const [activeNav, setActiveNav] = useState("Research cockpit");
+
+  const navigateTo = (label: string) => {
+    setActiveNav(label);
+    setSidebarOpen(false);
+    if (typeof window !== "undefined" && navToHash[label]) {
+      window.location.hash = navToHash[label];
+    }
+  };
+
+  useEffect(() => {
+    function syncHash() {
+      if (typeof window === "undefined") return;
+      const raw = window.location.hash.replace(/^#/, "").trim().toLowerCase();
+      if (raw && hashToNav[raw]) {
+        setActiveNav(hashToNav[raw]);
+      }
+    }
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [origin, setOrigin] = useState<"all" | "natural" | "synthetic">("all");
   const [cancerType, setCancerType] = useState("Non-small cell lung cancer");
@@ -148,9 +220,9 @@ export default function Home() {
         <div className="brand"><div className="brand-mark"><span>O</span></div><div><strong>ONCOGON <em>AI</em></strong><small>OSIEL RESEARCH ENGINE</small></div></div>
         <div className="workspace-card"><span>RESEARCH WORKSPACE</span><button><div className="avatar">DR</div><div><b>Discovery Lab</b><small>Phase 1 · RUO</small></div><Icon name="chevron" size={14}/></button></div>
         <nav className="side-nav">
-          {navGroups.map((group) => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map(([icon, label]) => <button key={label} className={activeNav === label ? "active" : ""} onClick={() => { setActiveNav(label); setSidebarOpen(false); }}><Icon name={icon as IconName}/><span>{label}</span>{label === "Experiments" && <i>3</i>}</button>)}</div>)}
+          {navGroups.map((group) => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map(([icon, label]) => <button key={label} className={activeNav === label ? "active" : ""} onClick={() => navigateTo(label)}><Icon name={icon as IconName}/><span>{label}</span>{label === "Experiments" && <i>3</i>}</button>)}</div>)}
         </nav>
-        <div className="sidebar-foot"><div className="model-status"><span className="pulse"/><div><b>Activity Model Ready</b><small>OSIEL Activity Model v0.1</small></div></div><button onClick={() => setActiveNav("Settings")}><Icon name="settings"/><span>Workspace settings</span></button><p>Research use only · v0.1.0</p></div>
+        <div className="sidebar-foot"><div className="model-status"><span className="pulse"/><div><b>Activity Model Ready</b><small>OSIEL Activity Model v0.1</small></div></div><button onClick={() => navigateTo("Settings")}><Icon name="settings"/><span>Workspace settings</span></button><p>Research use only · v0.1.0</p></div>
       </aside>
 
       <main className="main-area">
@@ -168,7 +240,7 @@ export default function Home() {
             selectedIds={[...selected]}
             experiment={experiment}
             onRunExperiment={startExperiment}
-            onBackToCockpit={() => setActiveNav("Research cockpit")}
+            onBackToCockpit={() => navigateTo("Research cockpit")}
           /> : <>
           <section className="page-heading">
             <div><div className="eyebrow"><span>OSIEL / DISCOVERY</span><Badge tone="violet">Computational hypothesis</Badge></div><h1>Compound Prioritization Cockpit</h1><p>Traceable chemical intelligence, uncertainty-aware ranking, and governed experimental learning in one research loop.</p></div>
@@ -241,7 +313,7 @@ export default function Home() {
               <div className="protocol-summary"><div><span>Assay</span><b>CellTiter-Glo</b></div><div><span>Dose range</span><b>0.01–30 µM</b></div><div><span>Replicates</span><b>3 × 8 points</b></div><div><span>Duration</span><b>72 hours</b></div></div>
               <div className="experiment-flow">{["Plan protocol", "Generate plate map", "Simulate response", "Run QC", "Lock result"].map((stage, index) => <div key={stage} className={experimentStage >= index ? "done" : experimentStage === index - 1 ? "next" : ""}><i>{experimentStage > index ? <Icon name="check" size={13}/> : index + 1}</i><span>{stage}</span></div>)}</div>
               {experiment ? <div className="result-banner"><div className="result-icon"><Icon name="check"/></div><div><b>Dry-run {experiment.qcStatus}</b><span>{experiment.observationCount} synthetic observations · {experiment.resultId}</span></div><Badge tone="mint">No model mutation</Badge></div> : <div className="experiment-empty"><Icon name="flask"/><div><b>{selected.size} compounds queued</b><span>Creates an auditable software-flow test; it does not perform a physical experiment.</span></div></div>}
-              <div className="experiment-actions"><button className="primary wide" onClick={startExperiment} disabled={selected.size === 0 || (experimentStage >= 0 && experimentStage < 4)}><Icon name="play"/>{experimentStage >= 0 && experimentStage < 4 ? "Running governed dry-run…" : "Run computational experiment"}</button><button className="secondary wide" onClick={() => setActiveNav("Experiments")}>Open full laboratory output</button></div>
+              <div className="experiment-actions"><button className="primary wide" onClick={startExperiment} disabled={selected.size === 0 || (experimentStage >= 0 && experimentStage < 4)}><Icon name="play"/>{experimentStage >= 0 && experimentStage < 4 ? "Running governed dry-run…" : "Run computational experiment"}</button><button className="secondary wide" onClick={() => navigateTo("Experiments")}>Open full laboratory output</button></div>
             </article>
 
             <article className="governance-card card">
