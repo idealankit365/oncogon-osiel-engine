@@ -15,6 +15,12 @@ from app.schemas import DockingBox, VinaDockingRequest
 from app.vina_docking import DockingInputError, VinaDisabledError, VinaDockingService
 
 
+requires_vina = pytest.mark.skipif(
+    not VinaDockingService.binding_available(),
+    reason="optional AutoDock Vina binding is unavailable on this host",
+)
+
+
 RECEPTOR = b"""REMARK synthetic software-test receptor only
 ATOM      1  C1  REC A   1       0.000   0.000   0.000  1.00  0.00     0.000 C
 END
@@ -69,6 +75,7 @@ def successful_runner(command: list[str], **_: object) -> subprocess.CompletedPr
     )
 
 
+@requires_vina
 def test_vina_job_persists_real_worker_contract_without_shell(
     repository: Repository,
     tmp_path: Path,
@@ -97,6 +104,7 @@ def test_vina_operator_gate_is_enforced(repository: Repository) -> None:
         service.run(request(), "test-researcher")
 
 
+@requires_vina
 def test_vina_rejects_unprepared_ligand(repository: Repository, tmp_path: Path) -> None:
     service = VinaDockingService(
         repository,
@@ -109,6 +117,7 @@ def test_vina_rejects_unprepared_ligand(repository: Repository, tmp_path: Path) 
         service.run(bad, "test-researcher")
 
 
+@requires_vina
 def test_vina_timeout_is_recorded(repository: Repository, tmp_path: Path) -> None:
     def timed_out(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
         raise subprocess.TimeoutExpired(command, 10)
@@ -129,9 +138,8 @@ def test_vina_api_reports_disabled_default() -> None:
     client = TestClient(app)
     capability = client.get("/v1/docking/capabilities")
     assert capability.status_code == 200
-    assert capability.json()["binding_available"] is True
+    assert capability.json()["binding_available"] is VinaDockingService.binding_available()
     assert capability.json()["operator_enabled"] is False
 
     response = client.post("/v1/docking/jobs", json=request().model_dump(mode="json"))
     assert response.status_code == 503
-

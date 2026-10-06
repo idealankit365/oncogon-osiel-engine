@@ -138,7 +138,7 @@ export function ProfessorAI({
     setFeedbackMessage(result.error || `Faculty review recorded as ${result.feedbackId}. It was not used for automatic retraining.`);
   }
 
-  const answerText = serverAnswer?.answer ?? "No scientific answer available. Connect the backend and ask a question.";
+  const answerText = serverAnswer?.answer ?? "Ask a question to search project evidence. Answers are returned by the research engine.";
   const actions = serverAnswer ? [serverAnswer.recommended_action] : [];
   const needs = serverAnswer?.missing_information ?? [];
   const mode = serverAnswer?.mode === "hybrid-ollama-rag"
@@ -146,33 +146,33 @@ export function ProfessorAI({
     : serverAnswer?.mode === "local-ollama-rag"
       ? `Local ${serverAnswer.model || "Qwen"} · curated cited RAG`
       : serverAnswer
-        ? "Python evidence gate · abstained"
-        : "Backend unavailable";
+        ? "Evidence review · research engine"
+        : capabilities ? "Awaiting a question" : "Research engine unavailable";
 
   return <>
     <section className="module-heading">
-      <div><span>ANALYZE / PROFESSOR AI</span><h1>Governed scientific professor</h1><p>Upload approved research, retrieve page-level evidence, ask Qwen locally and preserve faculty review.</p></div>
+      <div><span>ANALYZE / PROFESSOR AI</span><h1>Governed scientific professor</h1><p>Upload approved research, retrieve page-level evidence, and preserve scientific review.</p></div>
       <div className="professor-live-summary">
-        <b>{capabilities ? "Python engine connected" : "Backend unavailable"}</b>
+        <b>{capabilities ? "Research engine connected" : "Research engine unavailable"}</b>
         <span>{capabilities?.document_count ?? 0} documents · {capabilities?.chunk_count ?? 0} chunks</span>
       </div>
     </section>
 
     <div className="professor-boundary">
-      <b>{capabilities?.enabled ? "Local model enabled" : "Local model capability-gated"}</b>
-      <span>Qwen composes prose only from supplied evidence. RDKit and validated endpoint models perform quantitative computation. Professor AI cannot authorize a laboratory or clinical action.</span>
+      <b>{capabilities?.enabled ? "AI synthesis available" : "AI synthesis not enabled"}</b>
+      <span>{capabilities?.enabled ? "AI synthesis uses retrieved evidence and remains subject to scientific review." : "Project document search and evidence review remain available when supported by the research engine."} Professor AI cannot authorize a laboratory or clinical action.</span>
     </div>
 
     <div className="professor-tabs" role="tablist" aria-label="Professor AI workspace">
       <button className={view === "ask" ? "active" : ""} onClick={() => setView("ask")}>Ask professor</button>
-      <button className={view === "library" ? "active" : ""} onClick={() => setView("library")}>Controlled library <em>{documents.length}</em></button>
+      <button className={view === "library" ? "active" : ""} onClick={() => setView("library")}>Project knowledge <em>{documents.length}</em></button>
     </div>
 
     {view === "library" ? <div className="professor-library-grid">
       <article className="module-card professor-upload">
-        <span>APPROVED DOCUMENT INGESTION</span>
-        <h2>Build the university evidence library</h2>
-        <p>Raw bytes and normalized page chunks are checksum-addressed. PDF, TXT and Markdown are supported.</p>
+        <span>PROJECT KNOWLEDGE</span>
+        <h2>Add research material</h2>
+        <p>Upload papers, protocols, study documents, experimental notes, or reports in PDF, TXT, or Markdown. The research engine validates and indexes approved content for evidence retrieval.</p>
         <label>Project scope<input value={projectScope} onChange={(event) => setProjectScope(event.target.value)} /></label>
         <label>Course scope<input value={courseScope} onChange={(event) => setCourseScope(event.target.value)} /></label>
         <label>Paper or document<input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next && !documentTitle) setDocumentTitle(next.name.replace(/\.[^.]+$/, "")); }} /></label>
@@ -181,13 +181,13 @@ export function ProfessorAI({
         <label>Source version<input value={sourceVersion} onChange={(event) => setSourceVersion(event.target.value)} /></label>
         <label>Licence / rights note<textarea value={rightsNote} onChange={(event) => setRightsNote(event.target.value)} placeholder="Who approved full-text indexing and under which licence?" /></label>
         <label className="professor-check"><input type="checkbox" checked={rightsApproved} onChange={(event) => setRightsApproved(event.target.checked)} /><span>I confirm this institution is permitted to index the uploaded full text.</span></label>
-        <button className="primary" onClick={() => void uploadDocument()} disabled={busy === "upload" || !capabilities?.ingestion_enabled}>{busy === "upload" ? "Building immutable index…" : capabilities?.ingestion_enabled ? "Ingest and index" : "Ingestion disabled by operator"}</button>
+        <button className="primary" onClick={() => void uploadDocument()} disabled={busy === "upload" || !capabilities?.ingestion_enabled} title={!capabilities?.ingestion_enabled ? "Document ingestion is not enabled in this environment" : undefined}>{busy === "upload" ? "Indexing document…" : capabilities?.ingestion_enabled ? "Add to project knowledge" : "Document ingestion is not enabled"}</button>
         {uploadMessage && <div className="professor-warning">{uploadMessage}</div>}
       </article>
 
       <article className="module-card professor-documents">
         <span>SCOPED CORPUS</span><h2>Reviewable source versions</h2>
-        {documents.length === 0 ? <div className="empty-professor">No documents are indexed in this project and course scope.</div> : documents.map((document) => <label className={`professor-document ${document.status}`} key={document.document_id}>
+        {documents.length === 0 ? <div className="empty-professor">No project documents have been added yet. Upload research material to build the project knowledge base.</div> : documents.map((document) => <label className={`professor-document ${document.status}`} key={document.document_id}>
           <input type="checkbox" disabled={document.status !== "indexed"} checked={selectedDocuments.has(document.document_id)} onChange={() => setSelectedDocuments((items) => { const next = new Set(items); if (next.has(document.document_id)) next.delete(document.document_id); else next.add(document.document_id); return next; })} />
           <div><b>{document.title}</b><span>{document.page_count} pages · {document.chunk_count} chunks · {document.embedding_model || "FTS5 lexical"}</span><small>SHA {document.raw_sha256.slice(0, 16)}… · {document.source_version}</small>{document.prompt_injection_flags.length > 0 && <em>Quarantined: {document.prompt_injection_flags.join(", ")}</em>}</div>
         </label>)}

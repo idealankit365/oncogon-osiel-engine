@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  getBackendJson,
   runDockingBenchmark,
   runVinaDocking,
   type DockingBenchmarkRun,
@@ -44,6 +45,8 @@ function downloadOutput(job: VinaDockingJob) {
 }
 
 export function VinaRunner({ openDiscoveryRunId }: Props) {
+  const [capability, setCapability] = useState<{ operator_enabled: boolean; binding_available: boolean } | null>(null);
+  useEffect(() => { getBackendJson<{ operator_enabled: boolean; binding_available: boolean }>("/v1/docking/capabilities").then(setCapability).catch(() => setCapability(null)); }, []);
   const [receptor, setReceptor] = useState<File | null>(null);
   const [ligand, setLigand] = useState<File | null>(null);
   const [box, setBox] = useState(initialBox);
@@ -135,7 +138,8 @@ export function VinaRunner({ openDiscoveryRunId }: Props) {
       <label><span>POSES</span><select value={numModes} onChange={(event) => setNumModes(Number(event.target.value))}><option value={3}>3</option><option value={5}>5</option><option value={9}>9</option><option value={20}>20</option></select></label>
       <label><span>CPU</span><select value={cpu} onChange={(event) => setCpu(Number(event.target.value))}><option value={1}>1</option><option value={2}>2</option><option value={4}>4</option></select></label>
     </div>
-    <button className="primary vina-run-button" onClick={execute} disabled={running || !receptor || !ligand}>{running ? "Vina is searching poses…" : "Run real Vina docking"}</button>
+    {capability && (!capability.operator_enabled || !capability.binding_available) && <p className="model-lab-lock">AutoDock Vina integration is not enabled on this host. No docking score will be generated.</p>}
+    <button className="primary vina-run-button" onClick={execute} disabled={running || !receptor || !ligand || !capability?.operator_enabled || !capability.binding_available} title={!capability?.operator_enabled || !capability?.binding_available ? "Docking is not enabled in this environment" : undefined}>{running ? "Docking in progress…" : "Run AutoDock Vina"}</button>
     {(running || progress > 0) && <div className="vina-progress"><i style={{ width: `${progress}%` }}/><span>{running ? "Bounded child process running · timeout 600 s" : job ? "Worker completed and artifacts retained by SHA-256" : "Waiting"}</span></div>}
     {error && <div className="vina-error"><b>Docking did not run</b><span>{error}</span></div>}
     {job && <div className={`vina-result ${job.status}`}>
@@ -147,7 +151,7 @@ export function VinaRunner({ openDiscoveryRunId }: Props) {
       {job.status === "completed" && <section className="vina-benchmark">
         <div><span>REDOCKING QUALIFICATION</span><h3>Can this setup recover the known crystallographic pose?</h3><p>Upload the exact prepared co-crystal ligand using the same heavy-atom order. OSIEL aligns each returned pose and calculates heavy-atom RMSD.</p></div>
         <label className={referenceLigand ? "loaded" : ""}><input type="file" accept=".pdbqt" onChange={(event) => { setReferenceLigand(event.target.files?.[0] ?? null); setBenchmark(null); setBenchmarkError(null); }}/><b>{referenceLigand ? referenceLigand.name : "Choose reference ligand PDBQT"}</b><small>Pass threshold · RMSD ≤ 2.0 Å</small></label>
-        <button onClick={benchmarkPoseRecovery} disabled={!referenceLigand || benchmarkRunning}>{benchmarkRunning ? "Aligning poses and calculating RMSD…" : "Run redocking benchmark"}</button>
+        <button onClick={benchmarkPoseRecovery} disabled={!capability?.operator_enabled || !capability.binding_available || !referenceLigand || benchmarkRunning} title={!capability?.operator_enabled || !capability?.binding_available ? "Docking is not enabled in this environment" : undefined}>{benchmarkRunning ? "Aligning poses and calculating RMSD…" : "Run redocking benchmark"}</button>
         {benchmarkError && <div className="vina-error"><b>Benchmark stopped safely</b><span>{benchmarkError}</span></div>}
         {benchmark && <div className={`vina-benchmark-result ${benchmark.status}`}><div><span>POSE RECOVERY</span><strong>{benchmark.status.toUpperCase()}</strong></div><div><span>BEST POSE</span><strong>{benchmark.best_pose_rank ?? "—"}</strong></div><div><span>BEST RMSD</span><strong>{benchmark.best_rmsd_angstrom?.toFixed(3) ?? "—"} Å</strong></div><div><span>AFFINITY SCORING</span><strong>NOT QUALIFIED</strong></div><p>{benchmark.scientific_boundary}</p></div>}
       </section>}

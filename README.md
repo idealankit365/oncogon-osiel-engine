@@ -2,14 +2,17 @@
 
 Developer reference implementation for the Oncogon Scientific Intelligence & Experimental Learning Engine (OSIEL). It connects a Next.js research cockpit to a Python/FastAPI cheminformatics service and demonstrates the governed loop from compound identity through prioritisation, computational experiment, QC, scientific review, and model-governance boundaries.
 
-## One-command Docker startup
+## Client showcase: one repository, one command
 
-Run `./start-osiel.sh` on macOS/Linux/WSL2, or `.\start-osiel.ps1` in Windows
-PowerShell. Add `--with-ai` to start Ollama and download the configured Qwen
-models. See [`docs/ONE_CLICK_SETUP.md`](docs/ONE_CLICK_SETUP.md) and the complete
-[`docs/INDEX.md`](docs/INDEX.md).
+Clone the repository, review `.env.showcase.example` if you need to adjust ports, then run:
 
-> Research software only. The default cockpit scorer and dose-response run are deterministic demonstrations. The optional model laboratory trains a real endpoint-specific baseline from a bounded ChEMBL snapshot, but it is not independently validated efficacy evidence. Simulated results remain prohibited from training, and no model can promote itself.
+```bash
+./start-osiel.sh
+```
+
+The script creates a safe `.env` if none exists, starts FastAPI and the frontend with Docker Compose, and runs `scripts/showcase-smoke.sh`. Open [the research interface](http://localhost:3000) or [the API docs](http://localhost:8000/v1/docs). On Windows PowerShell, use `./start-osiel.ps1`. The frontend and backend remain together in this repository. See [the live walkthrough](docs/CLIENT_SHOWCASE_GUIDE.md).
+
+> Research use only. The showcase backend uses reference compounds and deterministic computational hypotheses. It is not a clinical, validated oncology, or production-qualified laboratory system.
 
 ## Included
 
@@ -20,8 +23,8 @@ models. See [`docs/ONE_CLICK_SETUP.md`](docs/ONE_CLICK_SETUP.md) and the complet
 - Computational CellTiter-Glo dry-run with dose series, replicates, controls, 72 synthetic observations, QC, review, immutable-snapshot gate, and champion/challenger boundary.
 - Functional workspaces for registry, literature/evidence, prediction, ranking policies, scientific copilot, experiments, model governance, audit/lineage, and safety settings.
 - Searchable A549-focused literature registry with 12 PubMed-linked study records; only metadata and concise study-context summaries are stored.
-- Visible 96-well plate map, dose-response equation and curves, raw-like observation preview, automated QC results, and rejected training-eligibility decision.
-- Production-readiness control center with phase gates, external-dependency ledger, runtime truth, and role-permission simulation.
+- Backend-managed computational experiment records and QC summary; simulation-only results remain ineligible for model training.
+- Production-readiness control center showing backend-reported services, capabilities, and blockers.
 - Server-enforced production API-key/role boundary, immutable content-addressed raw-file storage, and a qualified-adapter contract for plate-reader imports.
 - A developer-grade SRS and a machine-readable end-to-end execution report.
 - Public-source Open Discovery workspace with optional Open Targets, PubChem, ChEMBL, RCSB PDB and AlphaFold DB clients; local RDKit similarity/QED/Lipinski/PAINS-Brenk-NIH computation; a live bounded SmallWorld query of a provider-reported 10.10B-entry map; and real operator-gated AutoDock Vina execution.

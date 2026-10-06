@@ -3,6 +3,9 @@
 .sites-runtime
 .wrangler
 backend/.venv
+.venv
+__pycache__
+.pytest_cache
 backend/data
 node_modules
 dist

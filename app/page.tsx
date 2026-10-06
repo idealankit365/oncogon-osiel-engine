@@ -133,9 +133,12 @@ export default function Home() {
       setSelected(new Set());
       setFocusId("");
       setRankingRunId("");
+      setCompoundCount(null);
+      setModels([]);
       setBackendConnected(false);
       setConnectionState("unavailable");
-      setEngineMessage(error instanceof Error ? `Backend unavailable. ${error.message}` : "Backend unavailable. Scientific services are currently unavailable.");
+      console.error("Research engine request failed", error);
+      setEngineMessage("Research engine unavailable. Retry the connection when the service is restored.");
       setEngineState("ready");
     }
   }
@@ -181,7 +184,7 @@ export default function Home() {
     <div className="app-shell">
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand"><div className="brand-mark"><span>O</span></div><div><strong>ONCOGON <em>AI</em></strong><small>OSIEL RESEARCH ENGINE</small></div></div>
-        <div className="workspace-card"><span>RESEARCH WORKSPACE</span><button><div className="avatar">OS</div><div><b>Research workspace</b><small>Phase 1 · RUO</small></div><Icon name="chevron" size={14}/></button></div>
+        <div className="workspace-card"><span>RESEARCH WORKSPACE</span><div className="workspace-identity"><div className="avatar">OS</div><div><b>Research workspace</b><small>Research use only</small></div></div></div>
         <nav className="side-nav">
           {navGroups.map((group) => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map(([icon, label]) => <button key={label} className={activeNav === label ? "active" : ""} onClick={() => { setActiveNav(label); setSidebarOpen(false); }}><Icon name={icon as IconName}/><span>{label}</span>{label === "Experiments" && <i>{experiment ? 1 : 0}</i>}</button>)}</div>)}
         </nav>
@@ -193,7 +196,7 @@ export default function Home() {
           <button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation"><Icon name="menu"/></button>
           <div className="breadcrumb"><span>OSIEL</span><Icon name="chevron" size={13}/><b>{activeNav}</b></div>
           <label className="global-search"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search compounds, IDs, evidence…"/><kbd>⌘ K</kbd></label>
-          <div className="top-actions"><button aria-label="Notifications"><Icon name="bell"/></button><div className={`connection ${backendConnected ? "live" : "demo"}`}><span/>{connectionState === "connected" ? "Python API live" : connectionState === "connecting" ? "Connecting…" : "Backend unavailable"}</div><div className="avatar small">OS</div></div>
+          <div className="top-actions"><div className={`connection ${backendConnected ? "live" : "demo"}`}><span/>{connectionState === "connected" ? "Research engine connected" : connectionState === "connecting" ? "Connecting…" : "Research engine unavailable"}</div><div className="avatar small">OS</div></div>
         </header>
 
         <div className="page-content">
@@ -207,11 +210,11 @@ export default function Home() {
           /> : <>
           <section className="page-heading">
             <div><div className="eyebrow"><span>OSIEL / DISCOVERY</span><Badge tone="violet">Computational hypothesis</Badge></div><h1>Compound Prioritization Cockpit</h1><p>Traceable chemical intelligence, uncertainty-aware ranking, and governed experimental learning in one research loop.</p></div>
-            <div className="heading-actions"><button className="secondary" disabled={!rankingRunId}><Icon name="download"/> Export run</button><button className="primary" onClick={runEngine} disabled={engineState === "running"}><Icon name={engineState === "running" ? "activity" : "play"}/>{engineState === "running" ? "Running OSIEL…" : "Run OSIEL engine"}</button></div>
+            <div className="heading-actions"><button className="secondary" disabled={!rankingRunId} title={!rankingRunId ? "Run a ranking before exporting" : "Download the current ranking as JSON"} onClick={() => { const blob = new Blob([JSON.stringify({ rankingRunId, cancerType, cellLine, candidates }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${rankingRunId}.json`; link.click(); URL.revokeObjectURL(url); }}><Icon name="download"/> Export run</button><button className="primary" onClick={runEngine} disabled={engineState === "running"}><Icon name={engineState === "running" ? "activity" : "play"}/>{engineState === "running" ? "Running OSIEL…" : "Run OSIEL engine"}</button></div>
           </section>
 
           {connectionState === "unavailable" && <section className="notice-bar"><Icon name="shield"/><div><b>Backend unavailable.</b> Scientific services are currently unavailable.</div><button onClick={() => void runEngine()}>Retry connection</button></section>}
-          <section className="notice-bar"><Icon name="shield"/><div><b>Research-use system.</b> Rankings are in-silico prioritization hypotheses—not clinical guidance or measured efficacy.</div><button>View claim boundaries</button></section>
+          <section className="notice-bar"><Icon name="shield"/><div><b>Research-use system.</b> Rankings are in-silico prioritization hypotheses—not clinical guidance or measured efficacy.</div><button onClick={() => setActiveNav("Model governance")}>View claim boundaries</button></section>
 
           <section className="context-card">
             <div className="context-title"><div className="section-icon"><Icon name="activity"/></div><div><span>SCIENTIFIC CONTEXT</span><h2>Define the governed prediction task</h2></div></div>
@@ -227,7 +230,7 @@ export default function Home() {
           <section className="metrics-grid">
             <Metric label="BACKEND COMPOUND REGISTRY" value={compoundCount === null ? "—" : String(compoundCount)} detail="Backend registry compounds" tone="mint"/>
             <Metric label="CANDIDATES IN VIEW" value={String(visible.length)} detail={`${visible.filter((item) => item.applicability_domain === "inside").length} inside model domain`} tone="cyan"/>
-            <Metric label="TOP-5 MEAN SCORE" value={`${topMean}/100`} detail="Backend ranking scores" tone="violet"/>
+            <Metric label="TOP-5 MEAN SCORE" value={candidates.length ? `${topMean}/100` : "—"} detail="Backend ranking scores" tone="violet"/>
             <Metric label="EXPERIMENT QUEUE" value={String(selected.size)} detail="Selected for computational dry-run" tone="amber"/>
           </section>
 
@@ -253,7 +256,7 @@ export default function Home() {
                     <td>{candidate.confidence}% <small className="uncertainty">±{candidate.uncertainty}</small></td>
                     <td><div className="score-pill"><strong>{candidate.score.toFixed(1)}</strong><span>/100</span></div></td>
                     <td><span className={`domain ${candidate.applicability_domain}`}><i/>{candidate.applicability_domain}</span></td>
-                    <td><button className="row-arrow" aria-label="Open candidate"><Icon name="chevron" size={16}/></button></td>
+                    <td><button className="row-arrow" aria-label={`Open ${candidate.display_name}`} onClick={(event) => { event.stopPropagation(); setFocusId(candidate.compound_id); }}><Icon name="chevron" size={16}/></button></td>
                   </tr>)}</tbody>
                 </table>
                 {visible.length === 0 && <div className="empty-state"><Icon name="search"/><b>{connectionState === "unavailable" ? "Backend unavailable" : "No compounds match this view"}</b><span>{connectionState === "unavailable" ? "Scientific services are currently unavailable. Retry connection." : "Clear the search or change candidate origin."}</span></div>}
@@ -266,7 +269,7 @@ export default function Home() {
               <div className="candidate-name"><span>{focused.compound_id}</span><h2>{focused.display_name}</h2><p>{focused.formula}</p></div>
               <div className="detail-tabs">{(["overview", "evidence", "admet"] as const).map((tab) => <button key={tab} className={detailTab === tab ? "active" : ""} onClick={() => setDetailTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}</div>
               {detailTab === "overview" && <div className="detail-panel"><div className="prediction-callout"><span>Predicted IC50</span><strong>{focused.predicted_ic50_um.toFixed(2)} <small>µM</small></strong><Badge tone={focused.confidence >= 75 ? "mint" : "amber"}>{focused.confidence}% confidence</Badge></div><ScoreBar label="Predicted activity" value={focused.activity}/><ScoreBar label="Selectivity" value={focused.selectivity} tone="cyan"/><ScoreBar label="Model confidence" value={focused.confidence} tone="mint"/><div className="detail-note"><Icon name="robot"/><p>{focused.note}</p></div></div>}
-              {detailTab === "evidence" && <div className="detail-panel"><div className="evidence-grade"><b>{focused.evidence_grade}</b><div><span>Evidence grade</span><strong>{focused.evidence_grade === "A" ? "Curated reference" : focused.evidence_grade === "B" ? "Verified identity" : "Limited context"}</strong></div></div><dl className="evidence-list"><div><dt>Source</dt><dd>{focused.source}</dd></div><div><dt>Model domain</dt><dd>{focused.applicability_domain}</dd></div><div><dt>Uncertainty</dt><dd>{focused.uncertainty}%</dd></div><div><dt>Claim type</dt><dd>In-silico hypothesis</dd></div></dl><button className="wide-secondary"><Icon name="book"/> Inspect lineage record</button></div>}
+              {detailTab === "evidence" && <div className="detail-panel"><div className="evidence-grade"><b>{focused.evidence_grade}</b><div><span>Evidence grade</span><strong>{focused.evidence_grade === "A" ? "Curated reference" : focused.evidence_grade === "B" ? "Verified identity" : "Limited context"}</strong></div></div><dl className="evidence-list"><div><dt>Source</dt><dd>{focused.source}</dd></div><div><dt>Model domain</dt><dd>{focused.applicability_domain}</dd></div><div><dt>Uncertainty</dt><dd>{focused.uncertainty}%</dd></div><div><dt>Claim type</dt><dd>In-silico hypothesis</dd></div></dl><button className="wide-secondary" onClick={() => setActiveNav("Audit & lineage")}><Icon name="book"/> Inspect lineage record</button></div>}
               {detailTab === "admet" && <div className="detail-panel admet-list">{focused.admet.map((endpoint) => <div key={endpoint.code}><div className={`admet-symbol ${endpoint.className}`}>{endpoint.label[0]}</div><div><span>{endpoint.label}</span><b>{endpoint.value}/100</b></div><Badge tone={endpoint.className === "good" ? "mint" : endpoint.className === "risk" ? "red" : "amber"}>{endpoint.className}</Badge></div>)}<p>Backend-provided endpoint estimates are separate research hypotheses. Production adapters target ADMET-AI or validated endpoint models.</p></div>}
             </aside> : <aside className="candidate-card card"><div className="empty-state">Select a backend candidate to inspect its results.</div></aside>}
           </section>
@@ -289,7 +292,7 @@ export default function Home() {
             </article>
           </section>
 
-          <footer className="page-footer"><div><strong>OSIEL</strong> · Oncogon Scientific Intelligence & Experimental Learning Engine</div><div>Developer reference v0.1.0 <span/> Research use only</div></footer>
+          <footer className="page-footer"><div><strong>OSIEL</strong> · Oncogon Scientific Intelligence & Experimental Learning Engine</div><div>Research showcase v0.1.0 <span/> Research use only</div></footer>
           </>}
         </div>
       </main>

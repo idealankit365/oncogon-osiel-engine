@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  getBackendJson,
   refreshZincSearch,
   startZincSearch,
   type ZincCandidate,
@@ -39,6 +40,8 @@ function compactCount(value: number) {
 
 
 export function Zinc22Search({ seedSmiles }: { seedSmiles: string }) {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => { getBackendJson<{ enabled: boolean }>("/v1/zinc22/capabilities").then((capability) => setEnabled(capability.enabled)).catch(() => setEnabled(false)); }, []);
   const [graphDistance,setGraphDistance] = useState(2);
   const [anonymousDistance,setAnonymousDistance] = useState(1);
   const [maxResults,setMaxResults] = useState(25);
@@ -82,13 +85,13 @@ export function Zinc22Search({ seedSmiles }: { seedSmiles: string }) {
   },[job,pending,busy,refresh]);
 
   return <section className="module-card zinc-runner">
-    <div className="card-title"><div><span>REMOTE MULTI-BILLION SEARCH</span><h2>ZINC-22 / CartBlanche SmallWorld</h2></div><b className="zinc-live">REAL PUBLIC TASK · BOUNDED IMPORT</b></div>
+    <div className="card-title"><div><span>REMOTE MULTI-BILLION SEARCH</span><h2>ZINC-22 / CartBlanche SmallWorld</h2></div><b className="zinc-live">{enabled ? "PUBLIC SOURCE AVAILABLE" : "NOT ENABLED IN THIS ENVIRONMENT"}</b></div>
     <div className="zinc-boundary"><b>Where the billions live</b><span>The public CartBlanche server searches its distributed index. Your workstation sends one canonical seed and receives at most {maxResults} candidates for local RDKit assessment—it does not download billions of records.</span></div>
     <div className="zinc-controls">
       <label><span>Graph distance</span><select value={graphDistance} onChange={(event) => setGraphDistance(Number(event.target.value))}>{[0,1,2,3].map((value) => <option key={value} value={value}>{value}</option>)}</select><small>0 exact; larger values broaden edits</small></label>
       <label><span>Anonymous distance</span><select value={anonymousDistance} onChange={(event) => setAnonymousDistance(Number(event.target.value))}>{[0,1,2,3].map((value) => <option key={value} value={value}>{value}</option>)}</select><small>Allows topology variation</small></label>
       <label><span>Import limit</span><select value={maxResults} onChange={(event) => setMaxResults(Number(event.target.value))}>{[10,25,50,100].map((value) => <option key={value} value={value}>{value}</option>)}</select><small>RDKit-analyzed shortlist only</small></label>
-      <button className="primary" onClick={submit} disabled={busy || pending}>{busy && !job ? "Submitting public task…" : pending ? "Remote task running…" : "Search public ZINC-22"}</button>
+      <button className="primary" onClick={submit} disabled={!enabled || busy || pending} title={!enabled ? "Public ZINC-22 search is not enabled in this environment" : undefined}>{busy && !job ? "Submitting public task…" : pending ? "Remote task running…" : "Search public ZINC-22"}</button>
     </div>
     <code className="zinc-seed" title={seedSmiles}>Seed · {seedSmiles}</code>
     {error && <div className="zinc-error"><b>LIVE SEARCH STATUS</b><span>{error}</span></div>}
@@ -98,7 +101,7 @@ export function Zinc22Search({ seedSmiles }: { seedSmiles: string }) {
       {pending && <button onClick={() => void refresh()} disabled={busy}>{busy ? "Checking…" : "Refresh now"}</button>}
     </div>}
 
-    {(pending || (busy && !job)) && <div className="zinc-searching" role="status" aria-live="polite"><div className="od-spinner"><i/><span/></div><div><b>{job ? "CartBlanche is searching its remote index" : "Verifying the live map and searching public chemical space"}</b><span>{job ? "OSIEL keeps the task ID and never substitutes demo hits." : "The Python engine is contacting the provider, validating the advertised index and importing only the bounded result set for local RDKit analysis."}</span></div></div>}
+    {(pending || (busy && !job)) && <div className="zinc-searching" role="status" aria-live="polite"><div className="od-spinner"><i/><span/></div><div><b>{job ? "CartBlanche is searching its remote index" : "Verifying the live map and searching public chemical space"}</b><span>{job ? "OSIEL tracks the remote task and preserves its source identity." : "The research engine is contacting the provider, validating the advertised index and importing only the bounded result set for local RDKit analysis."}</span></div></div>}
 
     {job?.status === "completed" && <>
       <div className="zinc-complete"><div><span>INDEX ENTRIES</span><strong>{compactCount(job.index_entries)}</strong></div><div><span>MAPPED / SEARCHABLE</span><strong>{compactCount(job.index_mapped_entries)}</strong></div><div><span>REMOTE RETURNED</span><strong>{job.remote_returned_count}</strong></div><div><span>STANDARDIZED SHORTLIST</span><strong>{job.candidates.length}</strong></div><button onClick={() => downloadCsv(job)} disabled={!job.candidates.length}>Download CSV</button></div>

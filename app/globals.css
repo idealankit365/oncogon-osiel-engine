@@ -41,8 +41,7 @@ button:disabled { cursor: not-allowed; opacity: .68; }
 .brand small { display: block; margin-top: 3px; color: #747d9f; font-size: 8px; font-weight: 700; letter-spacing: .14em; }
 .workspace-card { padding: 17px 14px 8px; }
 .workspace-card > span, .nav-group > p { display: block; margin: 0 8px 8px; color: #697291; font-size: 9px; font-weight: 800; letter-spacing: .14em; }
-.workspace-card > button { width: 100%; display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 9px; padding: 9px; color: #e5e8f5; text-align: left; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.065); border-radius: 9px; }
-.workspace-card > button:hover { background: rgba(255,255,255,.075); }
+.workspace-identity { width: 100%; display: grid; grid-template-columns: 32px 1fr; align-items: center; gap: 9px; padding: 9px; color: #e5e8f5; text-align: left; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.065); border-radius: 9px; }
 .workspace-card b, .model-status b { display: block; font-size: 11px; }
 .workspace-card small, .model-status small { display: block; margin-top: 3px; color: #7f88a5; font-size: 9px; }
 .avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; background: linear-gradient(145deg, #6b5ee2, #3d327f); color: white; font-size: 10px; font-weight: 800; }

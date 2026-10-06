@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { RankedCandidate } from "../lib/ranked-candidate";
-import { runMultimodalResearchCase } from "../lib/osiel-client";
+import { getBackendJson, runMultimodalResearchCase } from "../lib/osiel-client";
 import type { MultimodalCaseResult } from "../lib/osiel-client";
 
 const modalities = [
@@ -14,6 +14,8 @@ const modalities = [
 ] as const;
 
 export function MultimodalWorkbench({ candidates }: { candidates: RankedCandidate[] }) {
+  const [capability, setCapability] = useState<{ enabled: boolean; model_adapters: Array<{ modality: string; configured: boolean; enabled: boolean }> } | null>(null);
+  useEffect(() => { getBackendJson<{ enabled: boolean; model_adapters: Array<{ modality: string; configured: boolean; enabled: boolean }> }>("/v1/multimodal/capabilities").then(setCapability).catch(() => setCapability(null)); }, []);
   const [question, setQuestion] = useState("What evidence is still missing before a supervised follow-up assay?");
   const [target, setTarget] = useState("EGFR");
   const [accession, setAccession] = useState("P00533");
@@ -51,12 +53,13 @@ export function MultimodalWorkbench({ candidates }: { candidates: RankedCandidat
   }
 
   return <div className="multimodal-shell">
-    <section className="module-heading multimodal-heading"><div><span>ANALYZE / MULTIMODAL ENGINE</span><h1>Evidence-fusion research console</h1><p>One governed case across molecules, proteins, assays, papers and microscopy—with visible execution, uncertainty and abstention.</p></div><div className={`multimodal-connection ${connected ? "live" : "offline"}`}><i/>{connected ? "Python engine connected" : "Fail-closed until API connects"}</div></section>
+    <section className="module-heading multimodal-heading"><div><span>ANALYZE / MULTIMODAL ENGINE</span><h1>Evidence-fusion research console</h1><p>One governed case across molecules, proteins, assays, papers and microscopy—with visible execution, uncertainty and abstention.</p></div><div className={`multimodal-connection ${connected ? "live" : "offline"}`}><i/>{connected ? "Research engine connected" : "Research engine unavailable"}</div></section>
 
-    <div className="multimodal-boundary"><b>Accuracy rule</b><span>No system can guarantee 100% biomedical accuracy. OSIEL reports only source-linked findings, caps confidence at 75%, abstains on weak evidence and requires named scientist approval.</span></div>
+    <div className="multimodal-boundary"><b>Capability status</b><span>{capability?.enabled ? "Research orchestration is available. Human approval is required." : "This optional research orchestration capability is not enabled in the current environment."}</span></div>
+    {capability && <div className="module-stats">{capability.model_adapters.map((adapter) => <div className="module-stat" key={adapter.modality}><span>{adapter.modality.toUpperCase()} MODEL</span><strong>{adapter.enabled && adapter.configured ? "Available" : "Not configured"}</strong><small>Backend-reported adapter state</small></div>)}</div>}
 
     <div className="module-grid two multimodal-config">
-      <article className="module-card"><div className="card-title"><div><span>RESEARCH QUESTION</span><h2>Define a reviewable case</h2></div><b>RUO</b></div><label className="multimodal-question"><span>Question</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={2000}/></label><div className="multimodal-fields"><label><span>Target</span><input value={target} onChange={(event) => setTarget(event.target.value)}/></label><label><span>UniProt accession</span><input value={accession} onChange={(event) => setAccession(event.target.value)}/></label></div><div className="candidate-context"><span>Case compounds</span>{candidates.slice(0,3).map((item) => <b key={item.compound_id}>{item.display_name}</b>)}</div><button className="primary wide" disabled={running || !question.trim() || selected.size === 0} onClick={run}>{running ? "Running governed case…" : "Run multimodal analysis"}</button></article>
+      <article className="module-card"><div className="card-title"><div><span>RESEARCH QUESTION</span><h2>Define a reviewable case</h2></div><b>RUO</b></div><label className="multimodal-question"><span>Question</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={2000}/></label><div className="multimodal-fields"><label><span>Target</span><input value={target} onChange={(event) => setTarget(event.target.value)}/></label><label><span>UniProt accession</span><input value={accession} onChange={(event) => setAccession(event.target.value)}/></label></div><div className="candidate-context"><span>Case compounds</span>{candidates.slice(0,3).map((item) => <b key={item.compound_id}>{item.display_name}</b>)}</div><button className="primary wide" disabled={!capability?.enabled || running || !question.trim() || selected.size === 0} onClick={run} title={!capability?.enabled ? "Not enabled in this environment" : undefined}>{running ? "Running governed case…" : "Run multimodal analysis"}</button></article>
       <article className="module-card"><div className="card-title"><div><span>MODALITY ROUTER</span><h2>Choose specialist lanes</h2></div><b>{selected.size}/5 selected</b></div><div className="modality-picker">{modalities.map(([id,label,detail]) => <button key={id} className={selected.has(id) ? "active" : ""} onClick={() => toggle(id)}><i>{selected.has(id) ? "✓" : "+"}</i><span><b>{label}</b><small>{detail}</small></span></button>)}</div></article>
     </div>
 

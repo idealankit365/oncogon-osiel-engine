@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AtomStyleSpec, GLViewer } from "3dmol";
-import type { RankedCandidate } from "../lib/ranked-candidate";
 import {
   loadCompoundConformer,
   type CompoundConformer3D,
@@ -39,9 +38,9 @@ export function Compound3DViewer({
   experimentId,
   resultStatus,
 }: {
-  candidate: RankedCandidate;
-  experimentId: string;
-  resultStatus: "completed" | "warning" | "failed" | "cancelled";
+  candidate: { compound_id: string; display_name: string; formula: string };
+  experimentId?: string;
+  resultStatus?: "completed" | "warning" | "failed" | "cancelled";
 }) {
   const host = useRef<HTMLDivElement | null>(null);
   const viewer = useRef<GLViewer | null>(null);
@@ -136,9 +135,9 @@ export function Compound3DViewer({
   return <section className="molecule-workbench">
     <div className="molecule-toolbar">
       <div className="molecule-identity">
-        <span>POST-EXPERIMENT STRUCTURE · {experimentId}</span>
+        <span>{experimentId ? `COMPUTED 3D STRUCTURE · ${experimentId}` : "COMPUTED 3D STRUCTURE"}</span>
         <h2>{candidate.display_name}</h2>
-        <p>{candidate.compound_id} · {candidate.formula} · result {resultStatus}</p>
+        <p>{candidate.compound_id} · {candidate.formula}{resultStatus ? ` · result ${resultStatus}` : ""}</p>
       </div>
       <div className="molecule-source">
         <i className={backendConnected ? "live" : "bundled"}/>

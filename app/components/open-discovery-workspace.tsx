@@ -126,7 +126,7 @@ export function OpenDiscoveryWorkspace() {
 
     <div className="od-boundary">
       <b>Capability boundary</b>
-      <span>This is not Recursion LOWE, PhenoMap, MatchMaker, generative chemistry, robotics, or a validated oncology model. It is an extensible public-source workflow your developers can run and inspect.</span>
+      <span>This is not Recursion LOWE, PhenoMap, MatchMaker, generative chemistry, robotics, or a validated oncology model. It is a reviewable public-source research workflow.</span>
     </div>
 
     <section className="od-config module-card">
@@ -167,7 +167,7 @@ export function OpenDiscoveryWorkspace() {
     </section>}
 
     {result && <>
-      <section className={`od-run-banner ${result.backendConnected ? "live" : "fixture"}`}>
+      <section className={`od-run-banner ${result.backendConnected ? "live" : "unavailable"}`}>
         <div><i/><span>{"PYTHON ENGINE"}</span><b>{result.modeMessage}</b></div>
         <div><span>Run ID</span><code>{result.run_id}</code></div>
         <div><span>Status</span><b>{statusLabel(result.status)}</b></div>

@@ -14,6 +14,7 @@ import { ModelLab } from "./model-lab";
 import { Zinc22Search } from "./zinc22-search";
 import { SourceConnectorConsole } from "./source-connectors";
 import { MultimodalWorkbench } from "./multimodal-workbench";
+import { Compound3DViewer } from "./compound-3d-viewer";
 
 type Props = {
   activeNav: string;
@@ -33,7 +34,7 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
 }
 
 type LiteratureRecord = { id: string; title: string; year: number; compound: string; biological_model: string; assay: string; finding: string; pmid: string; url: string; evidence_level: string; claim_boundary: string };
-type RegistryCompound = { compound_id: string; display_name: string; origin: string; source_name: string; evidence_grade: string; evidence_mode: string; descriptors: { molecular_formula: string } };
+type RegistryCompound = { compound_id: string; display_name: string; origin: string; source_id: string; source_name: string; evidence_grade: string; evidence_mode: string; canonical_smiles: string; inchikey: string; aliases: string[]; descriptors: { molecular_formula: string; molecular_weight: number } };
 
 function EvidenceWorkspace() {
   const [records, setRecords] = useState<LiteratureRecord[]>([]);
@@ -58,6 +59,8 @@ function RegistryWorkspace() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<RegistryCompound | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     const params = new URLSearchParams({ limit: "25", offset: String((page - 1) * 25) });
@@ -65,11 +68,19 @@ function RegistryWorkspace() {
     getBackendJson<RegistryCompound[]>(`/v1/compounds?${params}`).then((data) => { if (active) { setItems(data); setFocus(data[0]?.compound_id ?? ""); setError(null); } }).catch((cause) => { if (active) { setItems([]); setError(cause instanceof Error ? cause.message : "Backend unavailable"); } }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [page, query]);
+  useEffect(() => {
+    if (!focus) return;
+    let active = true;
+    getBackendJson<RegistryCompound>(`/v1/compounds/${encodeURIComponent(focus)}`).then((record) => { if (active) { setDetail(record); setDetailError(null); } }).catch(() => { if (active) { setDetail(null); setDetailError("Compound details are unavailable. Select another compound or retry."); } });
+    return () => { active = false; };
+  }, [focus]);
   const item = items.find((compound) => compound.compound_id === focus) ?? items[0];
-  return <><WorkspaceHeader eyebrow="DISCOVER / REGISTRY" title="Compound registry" description="Compounds are retrieved from the FastAPI scientific registry."><label className="module-search"><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Search backend compounds"/></label></WorkspaceHeader>
+  const selectedDetail = detail?.compound_id === focus ? detail : null;
+  return <><WorkspaceHeader eyebrow="DISCOVER / REGISTRY" title="Compound registry" description="Reference compounds from the research engine."><label className="module-search"><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Search compounds"/></label></WorkspaceHeader>
     <Zinc22Search seedSmiles="CC(=O)Oc1ccccc1C(=O)O"/>
     {error && <div className="registry-empty">Backend unavailable. {error}</div>}
-    <div className="module-grid registry-grid"><article className="module-card"><div className="card-title"><div><span>BACKEND REGISTRY</span><h2>{loading ? "Loading records…" : `${items.length} records in this view`}</h2></div><b>Page {page}</b></div><div className="registry-list">{items.map((compound, index) => <button key={compound.compound_id} className={focus === compound.compound_id ? "active" : ""} onClick={() => setFocus(compound.compound_id)}><span className="registry-rank">{(page - 1) * 25 + index + 1}</span><div><b>{compound.display_name}</b><span>{compound.descriptors.molecular_formula} · {compound.compound_id}</span></div><em>{compound.origin}</em></button>)}</div>{!loading && !error && items.length === 0 && <div className="registry-empty">No compounds match this view.</div>}<div className="registry-pagination"><button onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1}>← Previous</button><span>Page {page}</span><button onClick={() => setPage((value) => value + 1)} disabled={items.length < 25}>Next →</button></div></article>{item && <article className="module-card identity-card"><span>BACKEND COMPOUND</span><h2>{item.display_name}</h2><dl className="spec-list"><div><dt>OSIEL ID</dt><dd>{item.compound_id}</dd></div><div><dt>Formula</dt><dd>{item.descriptors.molecular_formula}</dd></div><div><dt>Record class</dt><dd>{item.evidence_mode}</dd></div><div><dt>Source</dt><dd>{item.source_name}</dd></div><div><dt>Evidence grade</dt><dd>{item.evidence_grade}</dd></div></dl></article>}</div>
+    <div className="module-grid registry-grid"><article className="module-card"><div className="card-title"><div><span>COMPOUND REGISTRY</span><h2>{loading ? "Loading records…" : `${items.length} records in this view`}</h2></div><b>Page {page}</b></div><div className="registry-list">{items.map((compound, index) => <button key={compound.compound_id} className={focus === compound.compound_id ? "active" : ""} onClick={() => setFocus(compound.compound_id)}><span className="registry-rank">{(page - 1) * 25 + index + 1}</span><div><b>{compound.display_name}</b><span>{compound.descriptors.molecular_formula} · {compound.compound_id}</span></div><em>{compound.origin}</em></button>)}</div>{!loading && !error && items.length === 0 && <div className="registry-empty">No compounds were returned for this view. Adjust the search or run a discovery workflow.</div>}<div className="registry-pagination"><button onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1}>← Previous</button><span>Page {page}</span><button onClick={() => setPage((value) => value + 1)} disabled={items.length < 25}>Next →</button></div></article>{item && <article className="module-card identity-card"><span>REFERENCE COMPOUND</span><h2>{item.display_name}</h2>{detailError && <p>{detailError}</p>}<dl className="spec-list"><div><dt>OSIEL ID</dt><dd>{item.compound_id}</dd></div><div><dt>Formula</dt><dd>{item.descriptors.molecular_formula}</dd></div><div><dt>Record class</dt><dd>{item.evidence_mode}</dd></div><div><dt>Source</dt><dd>{item.source_name}</dd></div><div><dt>Source record</dt><dd>{selectedDetail?.source_id ?? "Loading…"}</dd></div><div><dt>InChIKey</dt><dd>{selectedDetail?.inchikey ?? "Loading…"}</dd></div><div><dt>Evidence grade</dt><dd>{item.evidence_grade}</dd></div></dl></article>}</div>
+    {selectedDetail && <Compound3DViewer key={selectedDetail.compound_id} candidate={{ compound_id: selectedDetail.compound_id, display_name: selectedDetail.display_name, formula: selectedDetail.descriptors.molecular_formula }}/>}
   </>;
 }
 

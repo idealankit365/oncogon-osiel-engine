@@ -222,7 +222,7 @@ export async function loadCompoundConformer(
     return {
       conformer: await response.json() as CompoundConformer3D,
       backendConnected: true,
-      sourceLabel: "Live Python · RDKit ETKDGv3",
+      sourceLabel: "Computed by RDKit · ETKDGv3",
       error: null,
     };
   } catch (error) {
@@ -293,7 +293,7 @@ export async function loadRankedWorkspace(
       candidates: mapped,
       backendConnected: true,
       rankingRunId: ranking.ranking_run_id,
-      message: `Python engine ranked ${mapped.length} compounds.`,
+      message: `Research engine ranked ${mapped.length} compounds.`,
     };
 
   }
@@ -569,7 +569,7 @@ export async function runVinaDocking(input: VinaDockingInput): Promise<VinaDocki
     return {
       job: null,
       backendConnected: false,
-      error: "A connected Python API is required for real Vina execution. No score was simulated.",
+      error: "Docking service unavailable. No score was generated.",
     };
   }
 }
@@ -646,7 +646,7 @@ export async function startZincSearch(input: ZincSearchJob["request"]): Promise<
     }, 45_000);
     return zincResponse(response);
   } catch {
-    return { job: null, backendConnected: false, error: "A connected Python API is required for real ZINC-22 search. No remote results were fabricated." };
+    return { job: null, backendConnected: false, error: "External search service unavailable." };
   }
 }
 
@@ -658,7 +658,7 @@ export async function refreshZincSearch(jobId: string): Promise<ZincSearchResult
     }, 45_000);
     return zincResponse(response);
   } catch {
-    return { job: null, backendConnected: false, error: "The Python API could not refresh the remote ZINC-22 task; the task was not resubmitted." };
+    return { job: null, backendConnected: false, error: "The external search task could not be refreshed." };
   }
 }
 
@@ -1042,7 +1042,7 @@ export async function getModelLabCapabilities(): Promise<{ capabilities: ModelLa
     if (!response.ok) return { capabilities: null, backendConnected: true, error: await responseDetail(response) };
     return { capabilities: await response.json() as ModelLabCapabilities, backendConnected: true, error: null };
   } catch {
-    return { capabilities: null, backendConnected: false, error: "Connect the supplied Python API to run the evidence-backed model laboratory." };
+    return { capabilities: null, backendConnected: false, error: "Model laboratory unavailable. Check the research engine connection." };
   }
 }
 
@@ -1252,4 +1252,3 @@ export async function approveModel(
     return { approved: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
-

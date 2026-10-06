@@ -6,10 +6,12 @@ cd "${project_root}"
 
 command -v docker >/dev/null || { echo "Docker Desktop or Docker Engine is required." >&2; exit 69; }
 docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 is required." >&2; exit 69; }
+docker info >/dev/null 2>&1 || { echo "Docker Engine is not running. Start Docker Desktop and retry." >&2; exit 69; }
+command -v curl >/dev/null || { echo "curl is required for startup verification." >&2; exit 69; }
 
 if [[ ! -f .env ]]; then
-  cp .env.docker.example .env
-  echo "Created .env from the safe Docker template. Add approved keys and release URLs there only."
+  cp .env.showcase.example .env
+  echo "Created .env from the safe client showcase template."
 fi
 
 with_ai=false
@@ -46,11 +48,16 @@ else
   "${compose[@]}" up --build -d --wait api web
 fi
 
+web_port="$("${compose[@]}" port web 3000 | awk -F: '{print $NF}')"
+api_port="$("${compose[@]}" port api 8000 | awk -F: '{print $NF}')"
+OSIEL_WEB_URL="http://localhost:${web_port}" NEXT_PUBLIC_OSIEL_API_URL="http://localhost:${api_port}" ./scripts/showcase-smoke.sh
+
 echo
 echo "OSIEL is ready."
-echo "Application:      http://localhost:${OSIEL_WEB_PORT:-3000}"
-echo "Python API:       http://localhost:${OSIEL_API_PORT:-8000}/v1/docs"
-echo "OpenAPI contract: http://localhost:${OSIEL_API_PORT:-8000}/v1/openapi.json"
-echo "Health:           http://localhost:${OSIEL_API_PORT:-8000}/health"
+echo "Application:      http://localhost:${web_port}"
+echo "Scientific API:   http://localhost:${api_port}"
+echo "API docs:         http://localhost:${api_port}/v1/docs"
+echo "OpenAPI contract: http://localhost:${api_port}/v1/openapi.json"
+echo "Health:           http://localhost:${api_port}/health"
 echo
 echo "Use ./stop-osiel.sh to stop services without deleting data."

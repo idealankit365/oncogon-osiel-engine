@@ -17,7 +17,11 @@ The frontend uses `GET /health`, `/v1/system/capabilities`, `/v1/system/readines
 
 The backend's `OSIEL_DEMO_MODE=true` is acceptable only for development, tests, and a clearly labelled client showcase. It relaxes reference authentication and exposes deterministic research workflows. Production requires `OSIEL_DEMO_MODE=false` plus institutional OIDC, PostgreSQL/RDKit, managed object storage, validated oncology models and datasets, qualified laboratory instruments, observability, backups, and approval records.
 
-## Phase 2 extraction map
+## Superseded extraction proposal
+
+Phase 2 keeps the frontend and backend in this repository. The proposed split below is historical context only and must not be executed for the client showcase.
+
+## Historical extraction map
 
 - `oncogon-osiel-web`: `app/`, `public/`, `worker/`, `build/`, frontend `scripts/`, Next/Vite/Cloudflare config, `package*.json`, frontend tests.
 - `oncogon-osiel-api`: `backend/app/`, `backend/tests/`, `backend/scripts/`, backend requirements and API container files.
