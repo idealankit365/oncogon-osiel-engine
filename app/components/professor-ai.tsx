@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { RankedCandidate } from "../lib/demo-data";
+import { useEffect, useState } from "react";
+import type { RankedCandidate } from "../lib/ranked-candidate";
 import {
   askScientificProfessor,
   ingestProfessorDocument,
@@ -13,50 +13,6 @@ import {
   type ProfessorCapabilities,
   type ProfessorDocument,
 } from "../lib/osiel-client";
-
-type Topic = {
-  title: string;
-  keywords: string[];
-  answer: string;
-  actions: string[];
-  needs: string;
-  sources: Array<{ label: string; url: string }>;
-};
-
-const topics: Topic[] = [
-  {
-    title: "University readiness",
-    keywords: ["start", "before", "university", "approval", "ready", "biosafety", "dmp"],
-    answer: "Do not start a physical run from a software simulation. Confirm supervisor ownership, the applicable faculty approval route, a living data-management plan, authenticated cells, calibrated equipment, reagent traceability and pre-agreed controls.",
-    actions: ["Record the study ID, supervisor and institution profile.", "Verify cell identity, contamination status and instrument calibration.", "Lock the plate map and acceptance rules before data collection."],
-    needs: "University, local SOP version, faculty risk classification and named supervisor approval.",
-    sources: [{ label: "UCT research data management", url: "https://lib.uct.ac.za/digitalservices/documentation/rdm-policy" }],
-  },
-  {
-    title: "Assay failure diagnosis",
-    keywords: ["fail", "failed", "failure", "control", "cv", "missing", "wrong"],
-    answer: "Treat a failed control or incomplete plate as an invalid run, not weak compound activity. Preserve the raw export, investigate control performance, handling, reader settings and missing wells, then repeat only after the cause is documented.",
-    actions: ["Block potency interpretation.", "Inspect positive, vehicle and intermediate controls.", "Link the documented cause to a recovery experiment."],
-    needs: "Raw readings, control identities, acceptance thresholds, plate map and instrument metadata.",
-    sources: [{ label: "NCATS Assay Guidance Manual", url: "https://www.ncbi.nlm.nih.gov/books/NBK53196/" }],
-  },
-  {
-    title: "Next compound selection",
-    keywords: ["compound", "next", "choose", "priority", "test", "recommend"],
-    answer: "Choose an in-domain candidate that adds useful chemical or evidence diversity while carrying forward uncertainty and feasibility penalties. A recommendation is a hypothesis, never proof of activity.",
-    actions: ["Separate control failures from compound failures.", "Compare hypothesis, uncertainty, domain, flags and evidence grade.", "Record why the chosen candidate outranked alternatives."],
-    needs: "Failure class, stock identity, assay compatibility and laboratory decision thresholds.",
-    sources: [{ label: "NCATS Assay Guidance Manual", url: "https://www.ncbi.nlm.nih.gov/books/NBK53196/" }],
-  },
-  {
-    title: "Learning eligibility",
-    keywords: ["train", "model", "learn", "learning", "dataset", "eligible"],
-    answer: "A simulated or merely uploaded row cannot train the governed model. Real measurements must pass schema, assay QC, provenance and independent review before an immutable dataset snapshot and leakage-safe challenger evaluation.",
-    actions: ["Label simulated and measured rows.", "Quarantine failed-QC records.", "Evaluate a challenger offline; require named approval before promotion."],
-    needs: "Approved measurements, sample lineage, QC, dataset version and signed review.",
-    sources: [{ label: "FAIR principles", url: "https://www.go-fair.org/fair-principles/" }],
-  },
-];
 
 const quickPrompts = [
   "What must I check before starting?",
@@ -74,7 +30,7 @@ export function ProfessorAI({
 }) {
   const [view, setView] = useState<"ask" | "library">("ask");
   const [question, setQuestion] = useState(quickPrompts[0]);
-  const [submitted, setSubmitted] = useState(quickPrompts[0]);
+
   const [history, setHistory] = useState<string[]>([]);
   const [serverAnswer, setServerAnswer] = useState<ProfessorAnswer | null>(null);
   const [capabilities, setCapabilities] = useState<ProfessorCapabilities | null>(null);
@@ -97,12 +53,6 @@ export function ProfessorAI({
   const [correction, setCorrection] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
-  const topic = useMemo(() => {
-    const words = submitted.toLowerCase().split(/\W+/).filter(Boolean);
-    return topics
-      .map((item) => ({ item, score: item.keywords.reduce((sum, key) => sum + (words.includes(key) || submitted.toLowerCase().includes(key) ? 1 : 0), 0) }))
-      .sort((a, b) => b.score - a.score)[0]?.item ?? topics[0];
-  }, [submitted]);
   const top = candidates[0];
 
   useEffect(() => {
@@ -120,7 +70,6 @@ export function ProfessorAI({
     const clean = value.trim();
     if (!clean || busy) return;
     setQuestion(clean);
-    setSubmitted(clean);
     setHistory((items) => [clean, ...items.filter((item) => item !== clean)].slice(0, 6));
     setBusy("ask");
     setError(null);
@@ -189,22 +138,22 @@ export function ProfessorAI({
     setFeedbackMessage(result.error || `Faculty review recorded as ${result.feedbackId}. It was not used for automatic retraining.`);
   }
 
-  const answerText = serverAnswer?.answer ?? topic.answer;
-  const actions = serverAnswer ? [serverAnswer.recommended_action] : topic.actions;
-  const needs = serverAnswer?.missing_information ?? [topic.needs];
+  const answerText = serverAnswer?.answer ?? "No scientific answer available. Connect the backend and ask a question.";
+  const actions = serverAnswer ? [serverAnswer.recommended_action] : [];
+  const needs = serverAnswer?.missing_information ?? [];
   const mode = serverAnswer?.mode === "hybrid-ollama-rag"
     ? `Local ${serverAnswer.model || "Qwen"} · hybrid cited RAG`
     : serverAnswer?.mode === "local-ollama-rag"
       ? `Local ${serverAnswer.model || "Qwen"} · curated cited RAG`
       : serverAnswer
-        ? "Python evidence gate · abstaining fallback"
-        : "Embedded guidance · connect Python for RAG";
+        ? "Python evidence gate · abstained"
+        : "Backend unavailable";
 
   return <>
     <section className="module-heading">
       <div><span>ANALYZE / PROFESSOR AI</span><h1>Governed scientific professor</h1><p>Upload approved research, retrieve page-level evidence, ask Qwen locally and preserve faculty review.</p></div>
       <div className="professor-live-summary">
-        <b>{capabilities ? "Python engine connected" : "Interface-only fallback"}</b>
+        <b>{capabilities ? "Python engine connected" : "Backend unavailable"}</b>
         <span>{capabilities?.document_count ?? 0} documents · {capabilities?.chunk_count ?? 0} chunks</span>
       </div>
     </section>
@@ -252,21 +201,21 @@ export function ProfessorAI({
         <button className="primary" onClick={() => void ask()} disabled={Boolean(busy)}>{busy === "ask" ? "Retrieving, grounding and checking citations…" : "Ask Professor"}</button>
         {error && <div className="professor-warning">{error}</div>}
         {conversationId && <div className="professor-conversation"><b>Persisted consultation</b><span>{conversationId}</span></div>}
-        {history.length > 0 && <div className="professor-history"><b>Recent questions</b>{history.map((item) => <button key={item} onClick={() => { setQuestion(item); setSubmitted(item); }}>{item}</button>)}</div>}
+        {history.length > 0 && <div className="professor-history"><b>Recent questions</b>{history.map((item) => <button key={item} onClick={() => { setQuestion(item);  }}>{item}</button>)}</div>}
       </article>
 
       <article className="module-card professor-answer">
-        <div className="assistant-label"><i>AI</i><span>OSIEL Professor<b>{mode}</b></span><em>{serverAnswer?.abstained ? "Abstained" : `${serverAnswer?.confidence ?? "curated"} confidence`}</em></div>
+        <div className="assistant-label"><i>AI</i><span>OSIEL Professor<b>{mode}</b></span><em>{serverAnswer?.abstained ? "Abstained" : `${serverAnswer?.confidence ?? "unavailable"} confidence`}</em></div>
         <div className="professor-score-strip"><span>Retrieval <b>{Math.round((serverAnswer?.retrieval_score ?? 0) * 100)}%</b></span><span>Citation gate <b>{Math.round((serverAnswer?.citation_coverage ?? 0) * 100)}%</b></span><span>Documents <b>{selectedDocuments.size || "all scoped"}</b></span></div>
-        <span className="answer-topic">{serverAnswer?.abstained ? "Evidence boundary" : topic.title}</span><h2>Professor response</h2><p>{answerText}</p>
-        <div className="context-strip"><span>Current candidate <b>{top?.display_name ?? "not selected"}</b></span><span>Experiment <b>{experiment?.experimentId ?? "teaching workspace"}</b></span></div>
+        <span className="answer-topic">{serverAnswer?.abstained ? "Evidence boundary" : "Scientific answer"}</span><h2>Professor response</h2><p>{answerText}</p>
+        <div className="context-strip"><span>Current candidate <b>{top?.display_name ?? "not selected"}</b></span><span>Experiment <b>{experiment?.experimentId ?? "no experiment selected"}</b></span></div>
         <h3>Do this next</h3><ol>{actions.map((action) => <li key={action}>{action}</li>)}</ol>
         <div className="missing-box"><b>Missing or required information</b>{needs.map((item) => <span key={item}>{item}</span>)}</div>
 
         {serverAnswer ? <div className="professor-sources"><b>Retrieved evidence · open and verify the original</b>{serverAnswer.evidence.map((source) => {
           const label = `${source.evidence_id}${source.page_number ? ` · page ${source.page_number}` : ""} · ${source.title || source.display_name || source.source || "source"}`;
           return <div className={`professor-citation ${source.used_by_model ? "used" : ""}`} key={source.evidence_id}>{source.url ? <a href={source.url} target="_blank" rel="noreferrer">{label} ↗</a> : <span>{label}</span>}{source.quote && <small>{source.quote}</small>}<em>{source.used_by_model ? "Cited by model" : "Retrieved context"}{source.retrieval_score !== undefined ? ` · ${Math.round(source.retrieval_score * 100)}%` : ""}</em></div>;
-        })}</div> : <div className="professor-sources"><b>Embedded sources used</b>{topic.sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.label} ↗</a>)}</div>}
+        })}</div> : null}
 
         {serverAnswer?.retrieval_trace.length ? <details className="professor-trace" open><summary>Visible execution trace · {serverAnswer.retrieval_trace.length} stages</summary>{serverAnswer.retrieval_trace.map((event, index) => <div key={`${event.stage}-${index}`}><i className={event.status} /><span><b>{event.stage}</b>{event.message}</span><em>{event.status}</em></div>)}</details> : null}
         {serverAnswer?.warnings.map((warning) => <div className="professor-warning" key={warning}>{warning}</div>)}

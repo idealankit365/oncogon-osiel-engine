@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AtomStyleSpec, GLViewer } from "3dmol";
-import type { RankedCandidate } from "../lib/demo-data";
+import type { RankedCandidate } from "../lib/ranked-candidate";
 import {
   loadCompoundConformer,
   type CompoundConformer3D,

@@ -90,7 +90,7 @@ export function VinaRunner({ openDiscoveryRunId }: Props) {
         cpu,
         seed: 20260822,
         timeout_seconds: 600,
-        open_discovery_run_id: openDiscoveryRunId?.startsWith("ODR-") && !openDiscoveryRunId.includes("EMBEDDED") ? openDiscoveryRunId : null,
+        open_discovery_run_id: openDiscoveryRunId || null,
       };
       const response = await runVinaDocking(input);
       setJob(response.job);

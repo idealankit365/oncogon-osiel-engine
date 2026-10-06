@@ -1,3 +1,5 @@
+> Historical assessment before the backend-driven client showcase refactor. References below to frontend D1, embedded fixtures, and browser fallbacks describe the earlier architecture and are superseded by README.md.
+
 # OSIEL — Technical Completion Guide
 
 **Audience:** the engineer(s) taking this from reference implementation to production.

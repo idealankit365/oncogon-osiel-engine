@@ -18,7 +18,7 @@ export function SourceConnectorConsole() {
   const [result, setResult] = useState<DataConnectorResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { loadDataConnectors().then(({ items: loaded, backendConnected: connected }) => { setItems(loaded); setBackendConnected(connected); }); }, []);
+  useEffect(() => { loadDataConnectors().then(({ items: loaded, backendConnected: connected }) => { setItems(loaded); setBackendConnected(connected); }).catch((cause) => { setItems([]); setBackendConnected(false); setError(cause instanceof Error ? cause.message : "Backend unavailable"); }); }, []);
   const current = useMemo(() => items.find((item) => item.source_code === selected), [items, selected]);
 
   async function run() {

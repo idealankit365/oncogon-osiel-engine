@@ -1,7 +1,32 @@
-import { demoCandidates, renumber } from "./demo-data";
-import type { RankedCandidate } from "./demo-data";
+import type { RankedCandidate } from "./ranked-candidate";
 
 const API_BASE = (process.env.NEXT_PUBLIC_OSIEL_API_URL ?? "").replace(/\/$/, "");
+
+export class OsielApiError extends Error {
+  constructor(public readonly title: string, message: string, public readonly status?: number) {
+    super(message);
+    this.name = "OsielApiError";
+  }
+}
+
+async function apiError(response: Response): Promise<OsielApiError> {
+  const detail = await response.text();
+  return new OsielApiError("Scientific service error", detail || `HTTP ${response.status}`, response.status);
+}
+
+export async function checkBackend(): Promise<{ capabilities: Record<string, unknown> }> {
+  const health = await apiFetch("/health", undefined, 8_000);
+  if (!health.ok) throw await apiError(health);
+  const response = await apiFetch("/v1/system/capabilities", undefined, 8_000);
+  if (!response.ok) throw await apiError(response);
+  return { capabilities: await response.json() as Record<string, unknown> };
+}
+
+export async function getBackendJson<T>(path: string): Promise<T> {
+  const response = await apiFetch(path);
+  if (!response.ok) throw await apiError(response);
+  return await response.json() as T;
+}
 
 export type DataConnectorCapability = {
   source_code: string;
@@ -35,29 +60,10 @@ export type DataConnectorResult = {
   next_gate?: string;
 };
 
-const connectorFallback: DataConnectorCapability[] = [
-  ["nci60", "NCI-60 / CellMiner", "approved-bulk-release", "Cancer-cell-line compound responses"],
-  ["tdc", "Therapeutics Data Commons", "official-python-library", "Drug-discovery benchmark datasets"],
-  ["coconut", "COCONUT 2.0", "approved-bulk-release", "Natural-product structures and annotations"],
-  ["npass", "NPASS", "approved-bulk-release", "Natural-product activities, targets and species"],
-  ["anpdb", "African Natural Products Database", "approved-bulk-release", "African compounds, organisms and literature"],
-  ["lotus", "LOTUS", "approved-bulk-release", "Natural-product occurrence and organism provenance"],
-  ["tox21", "Tox21", "approved-bulk-release", "Public high-throughput toxicity assays"],
-  ["toxcast", "EPA ToxCast", "approved-bulk-release", "EPA invitrodb toxicity and pathway endpoints"],
-  ["uniprot", "UniProt", "official-rest-api", "Protein identity, sequence and cross-references"],
-  ["chemspace", "Chemspace", "licensed-api", "Supplier availability and procurement hand-off"],
-].map(([source_code, source_name, connector_type, purpose]) => ({
-  source_code, source_name, connector_type, purpose, configured: false, live_enabled: false,
-}));
-
 export async function loadDataConnectors(): Promise<{ items: DataConnectorCapability[]; backendConnected: boolean }> {
-  try {
-    const response = await apiFetch("/v1/data-connectors");
-    if (!response.ok) throw new Error(`Connector API returned ${response.status}`);
-    return { items: await response.json() as DataConnectorCapability[], backendConnected: true };
-  } catch {
-    return { items: connectorFallback, backendConnected: false };
-  }
+  const response = await apiFetch("/v1/data-connectors");
+  if (!response.ok) throw await apiError(response);
+  return { items: await response.json() as DataConnectorCapability[], backendConnected: true };
 }
 
 export async function fetchBulkDataSource(sourceCode: string, releaseId: string): Promise<DataConnectorResult> {
@@ -176,16 +182,10 @@ export type CompoundConformer3D = {
   object_uri?: string;
   warnings: string[];
   scientific_boundary: string;
-  source_mode?: "bundled-rdkit-reference";
-};
-
-type DemoConformerBundle = {
-  schema_version: string;
-  records: CompoundConformer3D[];
 };
 
 async function apiFetch(path: string, init?: RequestInit, timeoutMs = 30_000): Promise<Response> {
-  if (!API_BASE) throw new Error("No backend URL configured");
+  if (!API_BASE) throw new OsielApiError("Backend unavailable", "NEXT_PUBLIC_OSIEL_API_URL is not configured.");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -194,6 +194,8 @@ async function apiFetch(path: string, init?: RequestInit, timeoutMs = 30_000): P
       signal: controller.signal,
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     });
+  } catch (error) {
+    throw new OsielApiError("Backend unavailable", error instanceof Error ? error.message : "Network request failed.");
   } finally {
     clearTimeout(timeout);
   }
@@ -223,37 +225,9 @@ export async function loadCompoundConformer(
       sourceLabel: "Live Python · RDKit ETKDGv3",
       error: null,
     };
-  } catch {
-    try {
-      const response = await fetch("/demo-conformers.json", { cache: "force-cache" });
-      if (!response.ok) throw new Error(`Bundle returned ${response.status}`);
-      const bundle = await response.json() as DemoConformerBundle;
-      const conformer = bundle.records.find((item) => (
-        item.compound_id === compoundId || item.registry_compound_id === compoundId
-      ));
-      if (!conformer) throw new Error("Compound is not present in the bundled reference set");
-      return {
-        conformer,
-        backendConnected: false,
-        sourceLabel: "Bundled Python-generated RDKit conformer",
-        error: null,
-      };
-    } catch {
-      return {
-        conformer: null,
-        backendConnected: false,
-        sourceLabel: "Unavailable",
-        error: "No verified 3D conformer is available for this compound. Connect the Python API; no structure was fabricated.",
-      };
-    }
+  } catch (error) {
+    return { conformer: null, backendConnected: false, sourceLabel: "Unavailable", error: error instanceof Error ? error.message : "3D structure unavailable" };
   }
-}
-
-function fallbackFor(origin: "all" | "natural" | "synthetic"): RankedCandidate[] {
-  const items = origin === "all"
-    ? demoCandidates
-    : demoCandidates.filter((item) => item.origin === origin);
-  return renumber(items);
 }
 
 function classify(value: string): "good" | "watch" | "risk" {
@@ -268,14 +242,14 @@ export async function loadRankedWorkspace(
   cellLine: string,
   origin: "all" | "natural" | "synthetic",
 ): Promise<WorkspaceResult> {
-  try {
+  {
     const compoundResponse = await apiFetch("/v1/compounds?limit=36");
     if (!compoundResponse.ok) throw new Error(`Compound API returned ${compoundResponse.status}`);
     const compounds = (await compoundResponse.json()) as ApiCompound[];
     const candidates = compounds
       .filter((item) => origin === "all" || item.origin === origin)
       .slice(0, 20);
-    if (candidates.length < 2) throw new Error("Not enough candidates for ranking");
+    if (candidates.length < 2) return { candidates: [], backendConnected: true, rankingRunId: "", message: "No compounds available for ranking." };
 
     const response = await apiFetch("/v1/rankings", {
       method: "POST",
@@ -321,13 +295,7 @@ export async function loadRankedWorkspace(
       rankingRunId: ranking.ranking_run_id,
       message: `Python engine ranked ${mapped.length} compounds.`,
     };
-  } catch {
-    return {
-      candidates: fallbackFor(origin),
-      backendConnected: false,
-      rankingRunId: "RNK-EMBEDDED-DEMO",
-      message: "Embedded deterministic demo loaded. Set NEXT_PUBLIC_OSIEL_API_URL for live Python calls.",
-    };
+
   }
 }
 
@@ -337,7 +305,7 @@ export async function runDryExperiment(
   cellLine: string,
   rankingRunId: string,
 ): Promise<DryRunResult> {
-  try {
+  {
     const created = await apiFetch("/v1/experiments", {
       method: "POST",
       headers: { "X-OSIEL-Actor": "workbench-researcher", "X-OSIEL-Role": "researcher" },
@@ -355,7 +323,7 @@ export async function runDryExperiment(
         duration_hours: 72,
         positive_control: "Doxorubicin",
         negative_control: "Vehicle",
-        source_ranking_run_id: rankingRunId.startsWith("RNK-") && !rankingRunId.includes("EMBEDDED") ? rankingRunId : null,
+        source_ranking_run_id: rankingRunId || null,
       }),
     });
     if (!created.ok) throw new Error(`Experiment API returned ${created.status}`);
@@ -378,19 +346,7 @@ export async function runDryExperiment(
       backendConnected: true,
       disclaimer: result.disclaimer,
     };
-  } catch {
-    const estimated = Object.fromEntries(
-      compoundIds.map((id, index) => [id, Number((1.8 + index * 1.37).toFixed(2))]),
-    );
-    return {
-      experimentId: "EXP-EMBEDDED-DRY-RUN",
-      resultId: "RES-EMBEDDED-DRY-RUN",
-      qcStatus: "passed",
-      observationCount: compoundIds.length * 8 * 3,
-      estimatedIc50: estimated,
-      backendConnected: false,
-      disclaimer: "Computational UI dry-run only. No physical assay or wet-lab measurement was performed.",
-    };
+
   }
 }
 
@@ -501,120 +457,8 @@ export type OpenDiscoveryResult = {
   modeMessage: string;
 };
 
-const referenceDescriptors: OpenCandidate["descriptors"] = {
-  molecular_formula: "C15H10O5",
-  molecular_weight: 270.24,
-  clogp: 2.58,
-  tpsa: 90.9,
-  h_bond_donors: 3,
-  h_bond_acceptors: 5,
-  rotatable_bonds: 1,
-  ring_count: 3,
-  fraction_csp3: 0,
-  qed: 0.63,
-};
-
-function fallbackOpenDiscovery(input: OpenDiscoveryInput): OpenDiscoveryResult {
-  const now = new Date().toISOString();
-  const names = ["NCI Reference 0108", "NCI Reference 0013", "Curcumin", "Tamoxifen", "Caffeine", "Aspirin", "Resveratrol", "5-Fluorouracil", "Catechin", "Apigenin", "Luteolin", "Quercetin"];
-  const similarities = [0.20, 0.164, 0.152, 0.092, 0.09, 0.077, 0.068, 0.068, 0.067, 0.058, 0.057, 0.056];
-  const candidates = names.slice(0, input.candidate_limit).map((name, index): OpenCandidate => {
-    const similarity = similarities[index] ?? Math.max(0.12, 0.22 - index * 0.015);
-    const qed = Math.max(0.35, referenceDescriptors.qed - index * 0.035);
-    const score = Number((similarity * 45 + qed * 20 + 15 + 10 + 7.5).toFixed(2));
-    return {
-      rank: index + 1,
-      compound_id: `EMBEDDED-${String(index + 1).padStart(3, "0")}`,
-      display_name: name,
-      source_name: "Embedded reference fixture",
-      source_record_id: `FIXTURE-${index + 1}`,
-      canonical_smiles: "Structure available from the connected Python engine",
-      inchikey: `EMBEDDED-DEMO-${index + 1}`,
-      similarity_to_seed: similarity,
-      descriptors: { ...referenceDescriptors, qed },
-      lipinski_violations: [],
-      pains_alerts: index === 3 ? ["example review flag"] : [],
-      brenk_alerts: [],
-      nih_alerts: [],
-      quality_flags: [],
-      priority_score: score,
-      score_components: [
-        { code: "seed-similarity", label: "Seed similarity", normalized_value: similarity, weight: 0.45, contribution: Number((similarity * 45).toFixed(2)), explanation: "Embedded UI fixture; connect Python for a real RDKit Morgan similarity calculation." },
-        { code: "qed", label: "QED", normalized_value: qed, weight: 0.2, contribution: Number((qed * 20).toFixed(2)), explanation: "Embedded UI fixture; connect Python for a real RDKit QED calculation." },
-        { code: "lipinski", label: "Rule-of-Five adherence", normalized_value: 1, weight: 0.15, contribution: 15, explanation: "No example Rule-of-Five flag in this embedded fixture." },
-        { code: "alerts", label: "Alert burden", normalized_value: index === 3 ? 0.67 : 1, weight: 0.1, contribution: index === 3 ? 6.7 : 10, explanation: "Example catalogue status; connect Python for RDKit alert matching." },
-        { code: "source-evidence", label: "Source evidence completeness", normalized_value: 0.75, weight: 0.1, contribution: 7.5, explanation: "Reference-fixture provenance only." },
-      ],
-      disposition: index < 2 ? "review" : index > 4 ? "deprioritize" : "review",
-      disposition_reason: "Embedded example only; rerun with the Python API before scientific review.",
-    };
-  });
-  const stages = [
-    ["target-evidence", "Resolve disease and target evidence", "Official Open Targets link prepared; no association data retrieved."],
-    ["structure-resolution", "Resolve target structure", "No prepared receptor supplied; structure qualification remains open."],
-    ["seed-resolution", "Resolve and standardize seed ligand", `${input.seed_compound_name || "Seed"} fixture resolved for the hosted demonstration.`],
-    ["analogue-search", "Retrieve structural analogues", "Embedded reference panel loaded; public services were not crawled."],
-    ["standardization", "Standardize and deduplicate candidates", "Reference-fixture identities loaded; connect Python for RDKit computation."],
-    ["medchem-alerts", "Evaluate medicinal-chemistry alerts", "Example review flags displayed; connect Python for PAINS/Brenk/NIH matching."],
-    ["transparent-ranking", "Rank screening candidates", "Five-component chemistry-priority formula displayed."],
-    ["docking-readiness", "Check AutoDock Vina prerequisites", "Docking not run; qualified receptor, ligands, box and benchmark are missing."],
-    ["procurement-handoff", "Prepare sourcing hand-off", "Chemspace link prepared; no order or availability claim made."],
-    ["review-gate", "Require scientific review", "Human review remains mandatory."],
-  ];
-  return {
-    run_id: "ODR-EMBEDDED-REFERENCE",
-    status: "completed-with-warning",
-    execution_mode: "local-python",
-    request: input,
-    seed: {
-      canonical_smiles: input.seed_smiles || "COc1cc2ncnc(Nc3ccc(F)c(Cl)c3)c2cc1OCCCN1CCOCC1",
-      inchikey: "XGALLCVXEZPNRQ-UHFFFAOYSA-N",
-      descriptors: { ...referenceDescriptors, molecular_formula: "C22H24ClFN4O3", molecular_weight: 446.91, clogp: 4.28, qed: 0.52 },
-      quality_flags: [],
-    },
-    seed_name: input.seed_compound_name || "User-supplied seed",
-    events: stages.map(([stage, label, message], index) => ({
-      sequence: index + 1,
-      stage,
-      label,
-      status: [1, 5, 7, 8].includes(index) ? "completed-with-warning" : "completed",
-      message,
-      duration_ms: 0,
-      metrics: { embedded_fixture: true },
-      evidence_ids: [],
-    })),
-    evidence: [
-      { evidence_id: "EMB-E01", source_code: "open-targets", source_name: "Open Targets Platform", mode: "link-out", status: "deferred", url: `https://platform.opentargets.org/search?q=${encodeURIComponent(input.disease)}`, statement: "Official search link only; no live data retrieved in hosted fallback.", licence_note: "Preserve evidence provenance and retrieval date.", source_record_id: null, retrieved_at: now },
-      { evidence_id: "EMB-E02", source_code: "zinc22", source_name: "ZINC22 / CartBlanche22", mode: "link-out", status: "deferred", url: "https://cartblanche22.docking.org/", statement: "Expansion source registered; no shared service was crawled.", licence_note: "Use approved export or deployment and follow service rules.", source_record_id: null, retrieved_at: now },
-      { evidence_id: "EMB-E03", source_code: "chemspace", source_name: "Chemspace", mode: "link-out", status: "available", url: "https://chem-space.com/", statement: "Supplier search hand-off only; availability was not checked.", licence_note: "Current provider terms and API key apply.", source_record_id: null, retrieved_at: now },
-    ],
-    candidates,
-    docking: {
-      status: "not-run",
-      engine: "AutoDock Vina",
-      executable_detected: false,
-      receptor_id: input.pdb_id || input.uniprot_accession,
-      required_inputs: ["prepared receptor PDBQT", "prepared ligand PDBQT", "validated docking box", "redocking benchmark"],
-      missing_inputs: ["Python worker and Vina executable", "prepared receptor PDBQT", "prepared ligand PDBQT", "validated docking box", "redocking benchmark"],
-      run_manifest: { execute: false, candidate_count: candidates.length, random_seed: 20260822 },
-      result_score_kcal_mol: null,
-      scientific_boundary: "No docking score exists. A real Vina result would remain an approximate pose-ranking output, not efficacy evidence.",
-    },
-    next_actions: [
-      "Connect NEXT_PUBLIC_OSIEL_API_URL to execute the Python/RDKit workflow.",
-      "Review candidate identity, alert flags and score components with a medicinal chemist.",
-      "Resolve and prepare a qualified receptor before any docking run.",
-      "Verify supplier, salt, stereochemistry, purity and safety approval before ordering.",
-    ],
-    claim_boundary: "This embedded result demonstrates the interface only. It does not predict target binding, efficacy or safety, execute docking, place an order, or perform a laboratory experiment.",
-    created_at: now,
-    backendConnected: false,
-    modeMessage: "Hosted embedded reference. Configure the Python API to run RDKit and optional official connectors.",
-  };
-}
-
 export async function runOpenDiscovery(input: OpenDiscoveryInput): Promise<OpenDiscoveryResult> {
-  try {
+  {
     const response = await apiFetch("/v1/open-discovery/runs", {
       method: "POST",
       headers: { "X-OSIEL-Actor": "workbench-researcher" },
@@ -624,7 +468,10 @@ export async function runOpenDiscovery(input: OpenDiscoveryInput): Promise<OpenD
       const detail = await response.text();
       throw new Error(`Open discovery API returned ${response.status}: ${detail}`);
     }
-    const result = (await response.json()) as Omit<OpenDiscoveryResult, "backendConnected" | "modeMessage">;
+    const created = (await response.json()) as Omit<OpenDiscoveryResult, "backendConnected" | "modeMessage">;
+    const persisted = await apiFetch(`/v1/open-discovery/runs/${encodeURIComponent(created.run_id)}`);
+    if (!persisted.ok) throw await apiError(persisted);
+    const result = (await persisted.json()) as Omit<OpenDiscoveryResult, "backendConnected" | "modeMessage">;
     return {
       ...result,
       backendConnected: true,
@@ -632,8 +479,7 @@ export async function runOpenDiscovery(input: OpenDiscoveryInput): Promise<OpenD
         ? "Python/RDKit engine completed with operator-enabled official public APIs."
         : "Python/RDKit engine completed against the versioned local reference registry.",
     };
-  } catch {
-    return fallbackOpenDiscovery(input);
+
   }
 }
 
@@ -955,7 +801,7 @@ export async function askScientificProfessor(
     return {
       answer: null,
       backendConnected: false,
-      error: "Python assistant unavailable; the embedded curated guidance is shown instead.",
+      error: "Backend unavailable. Scientific Professor cannot answer right now.",
     };
   }
 }

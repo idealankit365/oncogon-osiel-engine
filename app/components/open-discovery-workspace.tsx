@@ -71,6 +71,7 @@ export function OpenDiscoveryWorkspace() {
   const [running, setRunning] = useState(false);
   const [activeStage, setActiveStage] = useState(-1);
   const [result, setResult] = useState<OpenDiscoveryResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [focusId, setFocusId] = useState("");
 
   const focused = useMemo(
@@ -89,24 +90,29 @@ export function OpenDiscoveryWorkspace() {
       uniprot_accession: valueOrNull(uniprot)?.toUpperCase() ?? null,
     };
     setResult(null);
+    setError(null);
     setRunning(true);
     setActiveStage(0);
     const timer = window.setInterval(
       () => setActiveStage((stage) => Math.min(stage + 1, stageLabels.length - 1)),
       330,
     );
-    const [run] = await Promise.all([
-      runOpenDiscovery(request),
-      new Promise((resolve) => window.setTimeout(resolve, 1650)),
-    ]);
-    window.clearInterval(timer);
-    setActiveStage(stageLabels.length);
-    setResult(run);
-    setFocusId(run.candidates[0]?.compound_id ?? "");
-    setRunning(false);
+    try {
+      const run = await runOpenDiscovery(request);
+      setResult(run);
+      setFocusId(run.candidates[0]?.compound_id ?? "");
+    } catch (cause) {
+      setResult(null);
+      setError(cause instanceof Error ? cause.message : "Backend unavailable");
+    } finally {
+      window.clearInterval(timer);
+      setActiveStage(stageLabels.length);
+      setRunning(false);
+    }
   }
 
   return <div className="open-discovery">
+    {error && <div className="registry-empty"><b>Backend unavailable.</b> {error}</div>}
     <section className="module-heading od-heading">
       <div>
         <span>DISCOVER / OPEN WORKFLOW</span>
@@ -162,7 +168,7 @@ export function OpenDiscoveryWorkspace() {
 
     {result && <>
       <section className={`od-run-banner ${result.backendConnected ? "live" : "fixture"}`}>
-        <div><i/><span>{result.backendConnected ? "PYTHON ENGINE" : "EMBEDDED UI REFERENCE"}</span><b>{result.modeMessage}</b></div>
+        <div><i/><span>{"PYTHON ENGINE"}</span><b>{result.modeMessage}</b></div>
         <div><span>Run ID</span><code>{result.run_id}</code></div>
         <div><span>Status</span><b>{statusLabel(result.status)}</b></div>
         <div><span>Docking</span><b>No score · {result.docking.status}</b></div>

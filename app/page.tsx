@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { demoCandidates } from "./lib/demo-data";
-import type { RankedCandidate } from "./lib/demo-data";
-import { loadRankedWorkspace, runDryExperiment } from "./lib/osiel-client";
+import type { RankedCandidate } from "./lib/ranked-candidate";
+import { checkBackend, getBackendJson, loadRankedWorkspace, runDryExperiment } from "./lib/osiel-client";
 import type { DryRunResult } from "./lib/osiel-client";
 import { ModuleWorkspace } from "./components/module-workspaces";
 
@@ -84,13 +83,16 @@ export default function Home() {
   const [cellLine, setCellLine] = useState("A549");
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<"score" | "activity" | "confidence">("score");
-  const [candidates, setCandidates] = useState<RankedCandidate[]>(demoCandidates);
-  const [focusId, setFocusId] = useState(demoCandidates[0].compound_id);
-  const [selected, setSelected] = useState<Set<string>>(new Set(demoCandidates.slice(0, 3).map((item) => item.compound_id)));
-  const [rankingRunId, setRankingRunId] = useState("RNK-EMBEDDED-DEMO");
+  const [candidates, setCandidates] = useState<RankedCandidate[]>([]);
+  const [focusId, setFocusId] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [rankingRunId, setRankingRunId] = useState("");
   const [engineState, setEngineState] = useState<"ready" | "running" | "complete">("ready");
   const [backendConnected, setBackendConnected] = useState(false);
-  const [engineMessage, setEngineMessage] = useState("Embedded deterministic reference workspace ready.");
+  const [engineMessage, setEngineMessage] = useState("Connecting to scientific services…");
+  const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "unavailable" | "error">("connecting");
+  const [models, setModels] = useState<Array<{ name: string; version: string; alias: string; metrics?: { validated?: boolean } }>>([]);
+  const [compoundCount, setCompoundCount] = useState<number | null>(null);
   const [detailTab, setDetailTab] = useState<"overview" | "evidence" | "admet">("overview");
   const [experiment, setExperiment] = useState<DryRunResult | null>(null);
   const [experimentStage, setExperimentStage] = useState(-1);
@@ -104,32 +106,65 @@ export default function Home() {
     return [...filtered].sort((a, b) => b[sortBy] - a[sortBy]).map((candidate, index) => ({ ...candidate, rank: index + 1 }));
   }, [candidates, origin, query, sortBy]);
 
-  const focused = candidates.find((item) => item.compound_id === focusId) ?? visible[0] ?? demoCandidates[0];
+  const focused = candidates.find((item) => item.compound_id === focusId) ?? visible[0];
 
   async function runEngine() {
     setEngineState("running");
     setExperiment(null);
-    const result = await loadRankedWorkspace(cancerType, cellLine, origin);
-    setCandidates(result.candidates);
-    setRankingRunId(result.rankingRunId);
-    setBackendConnected(result.backendConnected);
-    setEngineMessage(result.message);
-    setSelected(new Set(result.candidates.slice(0, 3).map((item) => item.compound_id)));
-    setFocusId(result.candidates[0]?.compound_id ?? focusId);
-    setEngineState("complete");
+    try {
+      await checkBackend();
+      const [result, health, runtimeModels] = await Promise.all([
+        loadRankedWorkspace(cancerType, cellLine, origin),
+        getBackendJson<{ compound_count: number }>("/health"),
+        getBackendJson<typeof models>("/v1/models"),
+      ]);
+      setCandidates(result.candidates);
+      setRankingRunId(result.rankingRunId);
+      setBackendConnected(true);
+      setConnectionState("connected");
+      setCompoundCount(health.compound_count);
+      setModels(runtimeModels);
+      setEngineMessage(result.message);
+      setSelected(new Set(result.candidates.slice(0, 3).map((item) => item.compound_id)));
+      setFocusId(result.candidates[0]?.compound_id ?? "");
+      setEngineState("complete");
+    } catch (error) {
+      setCandidates([]);
+      setSelected(new Set());
+      setFocusId("");
+      setRankingRunId("");
+      setBackendConnected(false);
+      setConnectionState("unavailable");
+      setEngineMessage(error instanceof Error ? `Backend unavailable. ${error.message}` : "Backend unavailable. Scientific services are currently unavailable.");
+      setEngineState("ready");
+    }
   }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void runEngine(); }, 0);
+    return () => window.clearTimeout(timer);
+    // Initial context is loaded once; subsequent context changes require an explicit run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function startExperiment() {
     if (selected.size === 0) return null;
     setExperiment(null);
     setExperimentStage(0);
     const interval = window.setInterval(() => setExperimentStage((stage) => Math.min(stage + 1, 3)), 460);
-    const result = await runDryExperiment([...selected], cancerType, cellLine, rankingRunId);
-    window.clearInterval(interval);
-    setExperimentStage(4);
-    setExperiment(result);
-    setBackendConnected(result.backendConnected || backendConnected);
-    return result;
+    try {
+      const result = await runDryExperiment([...selected], cancerType, cellLine, rankingRunId);
+      window.clearInterval(interval);
+      setExperimentStage(4);
+      setExperiment(result);
+      return result;
+    } catch (error) {
+      window.clearInterval(interval);
+      setExperimentStage(-1);
+      setExperiment(null);
+      setEngineMessage(error instanceof Error ? error.message : "Experiment service unavailable.");
+      return null;
+    }
   }
 
   function toggleCandidate(id: string) {
@@ -146,11 +181,11 @@ export default function Home() {
     <div className="app-shell">
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="brand"><div className="brand-mark"><span>O</span></div><div><strong>ONCOGON <em>AI</em></strong><small>OSIEL RESEARCH ENGINE</small></div></div>
-        <div className="workspace-card"><span>RESEARCH WORKSPACE</span><button><div className="avatar">DR</div><div><b>Discovery Lab</b><small>Phase 1 · RUO</small></div><Icon name="chevron" size={14}/></button></div>
+        <div className="workspace-card"><span>RESEARCH WORKSPACE</span><button><div className="avatar">OS</div><div><b>Research workspace</b><small>Phase 1 · RUO</small></div><Icon name="chevron" size={14}/></button></div>
         <nav className="side-nav">
-          {navGroups.map((group) => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map(([icon, label]) => <button key={label} className={activeNav === label ? "active" : ""} onClick={() => { setActiveNav(label); setSidebarOpen(false); }}><Icon name={icon as IconName}/><span>{label}</span>{label === "Experiments" && <i>3</i>}</button>)}</div>)}
+          {navGroups.map((group) => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map(([icon, label]) => <button key={label} className={activeNav === label ? "active" : ""} onClick={() => { setActiveNav(label); setSidebarOpen(false); }}><Icon name={icon as IconName}/><span>{label}</span>{label === "Experiments" && <i>{experiment ? 1 : 0}</i>}</button>)}</div>)}
         </nav>
-        <div className="sidebar-foot"><div className="model-status"><span className="pulse"/><div><b>Champion online</b><small>osiel-demo-activity@0.1</small></div></div><button onClick={() => setActiveNav("Settings")}><Icon name="settings"/><span>Workspace settings</span></button><p>Research use only · v0.1.0</p></div>
+        <div className="sidebar-foot"><div className="model-status"><span className="pulse"/><div><b>{models.some((model) => model.alias === "champion" && model.metrics?.validated) ? "Validated model available" : "No validated production model"}</b><small>Research use only</small></div></div><button onClick={() => setActiveNav("Settings")}><Icon name="settings"/><span>Workspace settings</span></button><p>Research use only · v0.1.0</p></div>
       </aside>
 
       <main className="main-area">
@@ -158,7 +193,7 @@ export default function Home() {
           <button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation"><Icon name="menu"/></button>
           <div className="breadcrumb"><span>OSIEL</span><Icon name="chevron" size={13}/><b>{activeNav}</b></div>
           <label className="global-search"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search compounds, IDs, evidence…"/><kbd>⌘ K</kbd></label>
-          <div className="top-actions"><button aria-label="Notifications"><Icon name="bell"/></button><div className={`connection ${backendConnected ? "live" : "demo"}`}><span/>{backendConnected ? "Python API live" : "Embedded demo"}</div><div className="avatar small">DR</div></div>
+          <div className="top-actions"><button aria-label="Notifications"><Icon name="bell"/></button><div className={`connection ${backendConnected ? "live" : "demo"}`}><span/>{connectionState === "connected" ? "Python API live" : connectionState === "connecting" ? "Connecting…" : "Backend unavailable"}</div><div className="avatar small">OS</div></div>
         </header>
 
         <div className="page-content">
@@ -172,9 +207,10 @@ export default function Home() {
           /> : <>
           <section className="page-heading">
             <div><div className="eyebrow"><span>OSIEL / DISCOVERY</span><Badge tone="violet">Computational hypothesis</Badge></div><h1>Compound Prioritization Cockpit</h1><p>Traceable chemical intelligence, uncertainty-aware ranking, and governed experimental learning in one research loop.</p></div>
-            <div className="heading-actions"><button className="secondary"><Icon name="download"/> Export run</button><button className="primary" onClick={runEngine} disabled={engineState === "running"}><Icon name={engineState === "running" ? "activity" : "play"}/>{engineState === "running" ? "Running OSIEL…" : "Run OSIEL engine"}</button></div>
+            <div className="heading-actions"><button className="secondary" disabled={!rankingRunId}><Icon name="download"/> Export run</button><button className="primary" onClick={runEngine} disabled={engineState === "running"}><Icon name={engineState === "running" ? "activity" : "play"}/>{engineState === "running" ? "Running OSIEL…" : "Run OSIEL engine"}</button></div>
           </section>
 
+          {connectionState === "unavailable" && <section className="notice-bar"><Icon name="shield"/><div><b>Backend unavailable.</b> Scientific services are currently unavailable.</div><button onClick={() => void runEngine()}>Retry connection</button></section>}
           <section className="notice-bar"><Icon name="shield"/><div><b>Research-use system.</b> Rankings are in-silico prioritization hypotheses—not clinical guidance or measured efficacy.</div><button>View claim boundaries</button></section>
 
           <section className="context-card">
@@ -185,13 +221,13 @@ export default function Home() {
               <label><span>Endpoint</span><select defaultValue="activity_probability"><option value="activity_probability">Activity probability</option><option value="IC50">IC50 (separate task)</option><option value="GI50">GI50 (separate task)</option></select></label>
               <div className="segmented-field"><span>Candidate origin</span><div>{(["all", "natural", "synthetic"] as const).map((value) => <button key={value} className={origin === value ? "active" : ""} onClick={() => setOrigin(value)}>{value === "all" ? "All" : value[0].toUpperCase() + value.slice(1)}</button>)}</div></div>
             </div>
-            <div className="context-meta"><span><i className="dot green"/> Task <b>OSIEL-ACTIVITY-NSCLC-v1</b></span><span>Split: <b>scaffold-safe</b></span><span>Policy: <b>rank-policy@1.0</b></span><span>Updated: <b>deterministic demo</b></span></div>
+            <div className="context-meta"><span><i className="dot green"/> Task <b>{cancerType} · {cellLine}</b></span><span>Model domain: <b>backend reported</b></span><span>Ranking: <b>{rankingRunId || "not run"}</b></span><span>Updated: <b>{backendConnected ? "backend connected" : "unavailable"}</b></span></div>
           </section>
 
           <section className="metrics-grid">
-            <Metric label="FEDERATED CHEMICAL SPACE" value="10.10B" detail="9.43B mapped remotely + 192 local" tone="mint"/>
+            <Metric label="BACKEND COMPOUND REGISTRY" value={compoundCount === null ? "—" : String(compoundCount)} detail="Backend registry compounds" tone="mint"/>
             <Metric label="CANDIDATES IN VIEW" value={String(visible.length)} detail={`${visible.filter((item) => item.applicability_domain === "inside").length} inside model domain`} tone="cyan"/>
-            <Metric label="TOP-5 MEAN SCORE" value={`${topMean}/100`} detail="Transparent 7-component policy" tone="violet"/>
+            <Metric label="TOP-5 MEAN SCORE" value={`${topMean}/100`} detail="Backend ranking scores" tone="violet"/>
             <Metric label="EXPERIMENT QUEUE" value={String(selected.size)} detail="Selected for computational dry-run" tone="amber"/>
           </section>
 
@@ -220,19 +256,19 @@ export default function Home() {
                     <td><button className="row-arrow" aria-label="Open candidate"><Icon name="chevron" size={16}/></button></td>
                   </tr>)}</tbody>
                 </table>
-                {visible.length === 0 && <div className="empty-state"><Icon name="search"/><b>No compounds match this view</b><span>Clear the search or change candidate origin.</span></div>}
+                {visible.length === 0 && <div className="empty-state"><Icon name="search"/><b>{connectionState === "unavailable" ? "Backend unavailable" : "No compounds match this view"}</b><span>{connectionState === "unavailable" ? "Scientific services are currently unavailable. Retry connection." : "Clear the search or change candidate origin."}</span></div>}
               </div>
-              <div className="table-footer"><span>Showing {visible.length} ranked local candidates · expand through the live 10.10B remote search</span><span><i className="dot purple"/> Selected: <b>{selected.size}</b></span></div>
+              <div className="table-footer"><span>Showing {visible.length} backend-ranked candidates</span><span><i className="dot purple"/> Selected: <b>{selected.size}</b></span></div>
             </div>
 
-            <aside className="candidate-card card">
+            {focused ? <aside className="candidate-card card">
               <div className="candidate-hero"><div><Badge tone={focused.origin === "natural" ? "mint" : "blue"}>{focused.origin}</Badge><MoleculeSketch accent/></div><div className="candidate-score-ring" style={{ "--score": `${focused.score * 3.6}deg` } as CSSProperties}><div><b>{focused.score.toFixed(0)}</b><span>OSIEL</span></div></div></div>
               <div className="candidate-name"><span>{focused.compound_id}</span><h2>{focused.display_name}</h2><p>{focused.formula}</p></div>
               <div className="detail-tabs">{(["overview", "evidence", "admet"] as const).map((tab) => <button key={tab} className={detailTab === tab ? "active" : ""} onClick={() => setDetailTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}</div>
               {detailTab === "overview" && <div className="detail-panel"><div className="prediction-callout"><span>Predicted IC50</span><strong>{focused.predicted_ic50_um.toFixed(2)} <small>µM</small></strong><Badge tone={focused.confidence >= 75 ? "mint" : "amber"}>{focused.confidence}% confidence</Badge></div><ScoreBar label="Predicted activity" value={focused.activity}/><ScoreBar label="Selectivity" value={focused.selectivity} tone="cyan"/><ScoreBar label="Model confidence" value={focused.confidence} tone="mint"/><div className="detail-note"><Icon name="robot"/><p>{focused.note}</p></div></div>}
               {detailTab === "evidence" && <div className="detail-panel"><div className="evidence-grade"><b>{focused.evidence_grade}</b><div><span>Evidence grade</span><strong>{focused.evidence_grade === "A" ? "Curated reference" : focused.evidence_grade === "B" ? "Verified identity" : "Limited context"}</strong></div></div><dl className="evidence-list"><div><dt>Source</dt><dd>{focused.source}</dd></div><div><dt>Model domain</dt><dd>{focused.applicability_domain}</dd></div><div><dt>Uncertainty</dt><dd>{focused.uncertainty}%</dd></div><div><dt>Claim type</dt><dd>In-silico hypothesis</dd></div></dl><button className="wide-secondary"><Icon name="book"/> Inspect lineage record</button></div>}
-              {detailTab === "admet" && <div className="detail-panel admet-list">{focused.admet.map((endpoint) => <div key={endpoint.code}><div className={`admet-symbol ${endpoint.className}`}>{endpoint.label[0]}</div><div><span>{endpoint.label}</span><b>{endpoint.value}/100</b></div><Badge tone={endpoint.className === "good" ? "mint" : endpoint.className === "risk" ? "red" : "amber"}>{endpoint.className}</Badge></div>)}<p>Rule-based demo endpoints are separate estimates. Production adapters target ADMET-AI or validated endpoint models.</p></div>}
-            </aside>
+              {detailTab === "admet" && <div className="detail-panel admet-list">{focused.admet.map((endpoint) => <div key={endpoint.code}><div className={`admet-symbol ${endpoint.className}`}>{endpoint.label[0]}</div><div><span>{endpoint.label}</span><b>{endpoint.value}/100</b></div><Badge tone={endpoint.className === "good" ? "mint" : endpoint.className === "risk" ? "red" : "amber"}>{endpoint.className}</Badge></div>)}<p>Backend-provided endpoint estimates are separate research hypotheses. Production adapters target ADMET-AI or validated endpoint models.</p></div>}
+            </aside> : <aside className="candidate-card card"><div className="empty-state">Select a backend candidate to inspect its results.</div></aside>}
           </section>
 
           <section className="lower-grid">
@@ -246,7 +282,7 @@ export default function Home() {
 
             <article className="governance-card card">
               <div className="section-heading"><div><span>MODEL GOVERNANCE</span><h2>Champion / challenger gate</h2></div><Icon name="shield"/></div>
-              <div className="model-row champion"><div className="model-badge"><Icon name="check"/></div><div><span>CHAMPION</span><b>osiel-demo-activity@0.1</b><small>Approved reference · 2026-08-19</small></div><Badge tone="mint">Online</Badge></div>
+              <div className="model-row champion"><div className="model-badge"><Icon name="check"/></div><div><span>CHAMPION</span><b>{models.find((model) => model.alias === "champion")?.name ?? "No model configured"}</b><small>{models.some((model) => model.alias === "champion" && model.metrics?.validated) ? "Validated" : "Development reference · not validated"}</small></div><Badge tone="amber">Research only</Badge></div>
               <div className="model-divider"><span>Evaluation boundary</span></div>
               <div className="model-row"><div className="model-badge challenger"><Icon name="activity"/></div><div><span>CHALLENGER</span><b>Awaiting approved dataset</b><small>Training never starts from a UI upload</small></div><Badge>Locked</Badge></div>
               <ul className="gate-list"><li><Icon name="check"/> Scientific result approval required</li><li><Icon name="check"/> Immutable snapshot and leakage audit</li><li><Icon name="check"/> Independent evaluation and named reviewer</li></ul>

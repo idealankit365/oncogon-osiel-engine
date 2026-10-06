@@ -101,7 +101,7 @@ The first command queries the configured public SmallWorld map. The next two fet
 | `OSIEL_PROFESSOR_RETRIEVAL_K` | `8` | Maximum evidence chunks returned to one consultation. |
 | `OSIEL_PROFESSOR_RETENTION_DAYS` | `180` | Reference conversation-retention window; deletion is admin-only. |
 
-When `NEXT_PUBLIC_OSIEL_API_URL` is empty or unreachable, the interface deliberately falls back to a labelled TypeScript demonstration. For backend-connected development, keep the supplied URL.
+When `NEXT_PUBLIC_OSIEL_API_URL` is empty or unreachable, the interface displays “Backend unavailable” and does not invent scientific data. Set the URL to the FastAPI service for development and client showcases.
 
 ## Repository map
 
@@ -112,9 +112,9 @@ backend/app/connectors/      PubChem, ChEMBL, Open Targets, RCSB and AlphaFold c
 backend/app/data/            192 development/reference structures
 backend/tests/               Automated backend tests
 backend/scripts/             Seed generator and executable E2E scenario
-public/demo-conformers.json  Eight Python-generated conformers for hosted fallback
+3D conformers               Fetched from FastAPI; unavailable state on failure
 contracts/openapi.json       Generated API specification
-db/, drizzle/                Hosted experiment-history schema and migration
+backend/app/                 Sole scientific/domain persistence implementation
 docs/                        SRS, handoff and production-readiness documents
 deliverables/                SRS and experiment report artifacts
 scripts/                     Setup, run, test, build and packaging commands

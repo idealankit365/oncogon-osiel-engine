@@ -151,7 +151,7 @@ class Settings:
     cors_origins: tuple[str, ...] = tuple(
         value.strip()
         for value in os.getenv(
-            "OSIEL_CORS_ORIGINS", "http://localhost:3000,http://localhost:4173"
+            "OSIEL_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,http://localhost:4173,http://127.0.0.1:4173"
         ).split(",")
         if value.strip()
     )

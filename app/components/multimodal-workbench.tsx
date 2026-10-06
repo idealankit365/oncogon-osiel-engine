@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { RankedCandidate } from "../lib/demo-data";
+import type { RankedCandidate } from "../lib/ranked-candidate";
 import { runMultimodalResearchCase } from "../lib/osiel-client";
 import type { MultimodalCaseResult } from "../lib/osiel-client";
 
@@ -42,7 +42,7 @@ export function MultimodalWorkbench({ candidates }: { candidates: RankedCandidat
     setResult(response.result); setError(response.error);
   }
 
-  function toggle(id: string) {
+  function toggle(id: (typeof modalities)[number][0]) {
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id); else next.add(id);
