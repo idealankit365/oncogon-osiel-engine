@@ -45,7 +45,7 @@ export function Compound3DViewer({
   const host = useRef<HTMLDivElement | null>(null);
   const viewer = useRef<GLViewer | null>(null);
   const [conformer, setConformer] = useState<CompoundConformer3D | null>(null);
-  const [sourceLabel, setSourceLabel] = useState("Resolving Python conformer…");
+  const [sourceLabel, setSourceLabel] = useState("Preparing 3D structure…");
   const [backendConnected, setBackendConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

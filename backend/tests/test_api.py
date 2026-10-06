@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -151,6 +153,10 @@ def test_end_to_end_ranking_and_experiment() -> None:
     assert ranking.status_code == 200
     ranking_body = ranking.json()
     assert ranking_body["candidate_count"] == 4
+    exported = client.get(f"/v1/rankings/{ranking_body['ranking_run_id']}/export")
+    assert exported.status_code == 200
+    assert exported.json() == ranking_body
+    assert "attachment" in exported.headers["content-disposition"]
 
     experiment = client.post(
         "/v1/experiments",
@@ -176,3 +182,51 @@ def test_end_to_end_ranking_and_experiment() -> None:
     assert result.status_code == 200
     assert result.json()["simulation_only"] is True
     assert result.json()["qc_status"] == "passed"
+    persisted = client.get(f"/v1/experiments/{experiment.json()['experiment_id']}/results")
+    assert persisted.status_code == 200
+    assert persisted.json()[0]["result_id"] == result.json()["result_id"]
+    assert persisted.json()[0]["qc_checks"] == result.json()["qc_checks"]
+
+
+def test_research_runs_vary_but_persist_with_scientific_bounds() -> None:
+    compounds = client.get("/v1/compounds?limit=4").json()
+    ids = [item["compound_id"] for item in compounds]
+    request = {"compound_ids": ids, "cancer_type": "Non-small cell lung cancer", "cell_line": "A549"}
+    first = client.post("/v1/rankings", json=request).json()
+    second = client.post("/v1/rankings", json=request).json()
+    changed_context = client.post("/v1/rankings", json={**request, "cell_line": "H1975"}).json()
+    assert first["ranking_run_id"] != second["ranking_run_id"]
+    assert first["simulation_seed"] != second["simulation_seed"]
+    by_id = lambda run: {item["compound_id"]: item["prediction"]["predicted_activity"] for item in run["ranked"]}
+    assert by_id(first) != by_id(second)
+    assert by_id(first) != by_id(changed_context)
+    assert client.get(f"/v1/rankings/{first['ranking_run_id']}").json() == first
+    assert first["result_type"] == "computational_research_simulation"
+    assert first["validation_status"] == "unvalidated"
+    from app.main import repository
+    stored_prediction = first["ranked"][0]["prediction"]
+    with repository.connection() as connection:
+        row = connection.execute("SELECT payload_json FROM prediction WHERE prediction_id = ?", (stored_prediction["prediction_id"],)).fetchone()
+    assert row is not None
+    assert json.loads(row["payload_json"]) == stored_prediction
+    for run in (first, second, changed_context):
+        for item in run["ranked"]:
+            prediction = item["prediction"]
+            assert 0 <= item["score"] <= 100
+            assert 0.05 <= prediction["predicted_activity"] <= 0.95
+            assert prediction["predicted_ic50_um"] > 0
+            assert 0.55 <= prediction["confidence"] <= 0.92
+            assert 0.04 <= prediction["uncertainty"] <= 0.24
+    assert any(item["ranking_run_id"] == first["ranking_run_id"] for item in client.get("/v1/rankings").json())
+
+
+def test_out_of_domain_estimate_cannot_gain_confidence() -> None:
+    from app.schemas import Prediction
+    from app.synthetic_model import simulate_prediction
+
+    ids = [item["compound_id"] for item in client.get("/v1/compounds?limit=2").json()]
+    base = client.post("/v1/predictions", json={"compound_ids": ids, "cancer_type": "lung", "cell_line": "A549"}).json()[0]
+    inside = simulate_prediction(Prediction.model_validate({**base, "applicability_domain": "inside"}), "fixed-seed")
+    outside = simulate_prediction(Prediction.model_validate({**base, "applicability_domain": "outside"}), "fixed-seed")
+    assert outside.confidence <= inside.confidence
+    assert outside.uncertainty >= inside.uncertainty

@@ -53,7 +53,7 @@ export function MultimodalWorkbench({ candidates }: { candidates: RankedCandidat
   }
 
   return <div className="multimodal-shell">
-    <section className="module-heading multimodal-heading"><div><span>ANALYZE / MULTIMODAL ENGINE</span><h1>Evidence-fusion research console</h1><p>One governed case across molecules, proteins, assays, papers and microscopy—with visible execution, uncertainty and abstention.</p></div><div className={`multimodal-connection ${connected ? "live" : "offline"}`}><i/>{connected ? "Research engine connected" : "Research engine unavailable"}</div></section>
+    <section className="module-heading multimodal-heading"><div><span>ANALYZE / MULTIMODAL ENGINE</span><h1>Evidence-fusion research console</h1><p>One governed case across molecules, proteins, assays, papers and microscopy—with visible execution, uncertainty and abstention.</p></div><div className={`multimodal-connection ${connected ? "live" : "offline"}`}><i/>{connected ? "Analysis available" : "Analysis not enabled"}</div></section>
 
     <div className="multimodal-boundary"><b>Capability status</b><span>{capability?.enabled ? "Research orchestration is available. Human approval is required." : "This optional research orchestration capability is not enabled in the current environment."}</span></div>
     {capability && <div className="module-stats">{capability.model_adapters.map((adapter) => <div className="module-stat" key={adapter.modality}><span>{adapter.modality.toUpperCase()} MODEL</span><strong>{adapter.enabled && adapter.configured ? "Available" : "Not configured"}</strong><small>Backend-reported adapter state</small></div>)}</div>}
@@ -65,7 +65,7 @@ export function MultimodalWorkbench({ candidates }: { candidates: RankedCandidat
 
     <article className="module-card multimodal-trace"><div className="card-title"><div><span>VISIBLE OPERATIONAL TRACE</span><h2>{running ? "Analysis in progress" : result ? "Execution complete" : "Waiting for a case"}</h2></div><b>No hidden reasoning shown</b></div><ol>{["Safety boundary","Molecule resolution","Protein / 3D","Assay QC","Evidence retrieval","Fusion + abstention"].map((label,index) => <li key={label} className={index < stage ? "done" : index === stage ? "active" : "waiting"}><i>{index < stage ? "✓" : String(index + 1).padStart(2,"0")}</i><span><b>{label}</b><small>{index < stage ? "Checked" : index === stage ? "Running validated stage" : "Waiting"}</small></span></li>)}</ol></article>
 
-    {error && <div className="multimodal-error"><b>SAFE STOP</b><span>{error}</span><small>Start the supplied FastAPI service and configure NEXT_PUBLIC_OSIEL_API_URL. No result was invented in the browser.</small></div>}
+    {error && <div className="multimodal-error"><b>Analysis unavailable</b><span>{error}</span><small>This optional integration requires operator configuration.</small></div>}
 
     {result && <>
       <div className="module-stats"><div className="module-stat"><span>CASE STATUS</span><strong>{result.status.toUpperCase()}</strong><small>{result.case_id}</small></div><div className="module-stat"><span>CALIBRATED CEILING</span><strong>{Math.round(result.confidence * 100)}%</strong><small>Never presented as certainty</small></div><div className="module-stat"><span>CITATION COVERAGE</span><strong>{Math.round(result.citation_coverage * 100)}%</strong><small>{result.evidence.length} evidence records</small></div><div className="module-stat"><span>LAB AUTHORIZATION</span><strong>LOCKED</strong><small>Scientist approval required</small></div></div>

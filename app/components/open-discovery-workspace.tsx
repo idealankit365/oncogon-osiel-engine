@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  getBackendJson,
   runOpenDiscovery,
   type OpenCandidate,
   type OpenDiscoveryInput,
@@ -64,6 +65,8 @@ function CandidateFlags({ candidate }: { candidate: OpenCandidate }) {
 }
 
 export function OpenDiscoveryWorkspace() {
+  const [publicSourcesEnabled, setPublicSourcesEnabled] = useState(false);
+  useEffect(() => { getBackendJson<Array<{ code: string; live_enabled: boolean }>>("/v1/open-discovery/connectors").then((connectors) => setPublicSourcesEnabled(connectors.some((source) => source.code !== "rdkit" && source.live_enabled))).catch(() => setPublicSourcesEnabled(false)); }, []);
   const [input, setInput] = useState(defaultInput);
   const [seedSmiles, setSeedSmiles] = useState("");
   const [pdbId, setPdbId] = useState("");
@@ -93,31 +96,26 @@ export function OpenDiscoveryWorkspace() {
     setError(null);
     setRunning(true);
     setActiveStage(0);
-    const timer = window.setInterval(
-      () => setActiveStage((stage) => Math.min(stage + 1, stageLabels.length - 1)),
-      330,
-    );
     try {
       const run = await runOpenDiscovery(request);
       setResult(run);
       setFocusId(run.candidates[0]?.compound_id ?? "");
-    } catch (cause) {
+    } catch {
       setResult(null);
-      setError(cause instanceof Error ? cause.message : "Backend unavailable");
+      setError("Please retry when discovery is available.");
     } finally {
-      window.clearInterval(timer);
       setActiveStage(stageLabels.length);
       setRunning(false);
     }
   }
 
   return <div className="open-discovery">
-    {error && <div className="registry-empty"><b>Backend unavailable.</b> {error}</div>}
+    {error && <div className="registry-empty"><b>Discovery workspace unavailable.</b> {error}</div>}
     <section className="module-heading od-heading">
       <div>
         <span>DISCOVER / OPEN WORKFLOW</span>
         <h1>Public-source discovery orchestrator</h1>
-        <p>A Recursion-inspired evidence-to-candidate flow built from public interfaces and local open-source computation—with every proprietary and unexecuted step visible.</p>
+        <p>A reviewable evidence-to-candidate workflow using local scientific computation and operator-enabled public sources.</p>
       </div>
       <button className="primary" onClick={execute} disabled={running}>
         {running ? "Running workflow…" : "Run open discovery"}
@@ -136,14 +134,14 @@ export function OpenDiscoveryWorkspace() {
         <label><span>Target symbol</span><input value={input.target_symbol ?? ""} onChange={(event) => setInput({ ...input, target_symbol: event.target.value })}/><small>Example: EGFR, RAF1, KRAS.</small></label>
         <label><span>Seed compound</span><input value={input.seed_compound_name ?? ""} onChange={(event) => setInput({ ...input, seed_compound_name: event.target.value })}/><small>Known local record or PubChem name.</small></label>
         <label><span>Candidate limit</span><select value={input.candidate_limit} onChange={(event) => setInput({ ...input, candidate_limit: Number(event.target.value) })}><option value={5}>5</option><option value={8}>8</option><option value={12}>12</option><option value={20}>20</option></select><small>Top transparent chemistry priorities.</small></label>
-        <label className="wide"><span>Seed SMILES <em>optional override</em></span><input value={seedSmiles} onChange={(event) => setSeedSmiles(event.target.value)} placeholder="Paste canonical or isomeric SMILES"/><small>The Python engine parses, parent-standardizes and fingerprints this value with RDKit.</small></label>
+        <label className="wide"><span>Seed SMILES <em>optional override</em></span><input value={seedSmiles} onChange={(event) => setSeedSmiles(event.target.value)} placeholder="Paste canonical or isomeric SMILES"/><small>The research engine standardizes and fingerprints this structure with RDKit.</small></label>
         <label><span>Experimental PDB ID <em>optional</em></span><input value={pdbId} onChange={(event) => setPdbId(event.target.value)} placeholder="Example: 4WKQ" maxLength={4}/><small>Preferred for qualified docking.</small></label>
         <label><span>UniProt accession <em>optional</em></span><input value={uniprot} onChange={(event) => setUniprot(event.target.value)} placeholder="Example: P00533"/><small>AlphaFold fallback; confidence review required.</small></label>
       </div>
       <label className="od-toggle">
-        <input type="checkbox" checked={input.public_connectors} onChange={(event) => setInput({ ...input, public_connectors: event.target.checked })}/>
+        <input type="checkbox" checked={input.public_connectors && publicSourcesEnabled} disabled={!publicSourcesEnabled} onChange={(event) => setInput({ ...input, public_connectors: event.target.checked })}/>
         <i><span/></i>
-        <div><b>Request live official APIs</b><span>The server operator must also set <code>OSIEL_PUBLIC_CONNECTORS_ENABLED=true</code>. Otherwise the run safely uses local data and records the blocked request.</span></div>
+        <div><b>Live public sources</b><span>{publicSourcesEnabled ? "Enable approved public source calls for this run." : "Not enabled in this environment. Local analysis remains available."}</span></div>
       </label>
     </section>
 

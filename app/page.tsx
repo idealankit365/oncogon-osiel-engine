@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { RankedCandidate } from "./lib/ranked-candidate";
-import { checkBackend, getBackendJson, loadRankedWorkspace, runDryExperiment } from "./lib/osiel-client";
+import { checkBackend, getBackendJson, listRankingRuns, loadRankingRun, loadRankedWorkspace, rankingExportUrl, runDryExperiment } from "./lib/osiel-client";
 import type { DryRunResult } from "./lib/osiel-client";
 import { ModuleWorkspace } from "./components/module-workspaces";
 
@@ -43,6 +43,8 @@ const navGroups = [
   { label: "VALIDATE", items: [["flask", "Experiments"], ["shield", "Model governance"], ["book", "Audit & lineage"]] },
   { label: "SYSTEM", items: [["settings", "Production center"], ["shield", "Recursion gap map"]] },
 ] as const;
+const navLabels = [...navGroups.flatMap((group) => group.items.map(([, label]) => label)), "Workspace settings"];
+const navSlug = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 const workflow = [
   ["01", "Identity", "Standardize & deduplicate"],
@@ -77,6 +79,7 @@ function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: str
 
 export default function Home() {
   const [activeNav, setActiveNav] = useState("Research cockpit");
+  const [navReady, setNavReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [origin, setOrigin] = useState<"all" | "natural" | "synthetic">("all");
   const [cancerType, setCancerType] = useState("Non-small cell lung cancer");
@@ -87,15 +90,30 @@ export default function Home() {
   const [focusId, setFocusId] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [rankingRunId, setRankingRunId] = useState("");
+  const [runHistory, setRunHistory] = useState<Array<{ ranking_run_id: string; cancer_type: string; cell_line: string | null; created_at: string; candidate_count: number }>>([]);
   const [engineState, setEngineState] = useState<"ready" | "running" | "complete">("ready");
-  const [backendConnected, setBackendConnected] = useState(false);
-  const [engineMessage, setEngineMessage] = useState("Connecting to scientific services…");
+  const [engineMessage, setEngineMessage] = useState("Preparing research workspace…");
   const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "unavailable" | "error">("connecting");
   const [models, setModels] = useState<Array<{ name: string; version: string; alias: string; metrics?: { validated?: boolean } }>>([]);
   const [compoundCount, setCompoundCount] = useState<number | null>(null);
   const [detailTab, setDetailTab] = useState<"overview" | "evidence" | "admet">("overview");
   const [experiment, setExperiment] = useState<DryRunResult | null>(null);
   const [experimentStage, setExperimentStage] = useState(-1);
+
+  useEffect(() => {
+    const readLocation = () => {
+      const label = navLabels.find((item) => navSlug(item) === window.location.hash.slice(1));
+      if (label) setActiveNav(label);
+    };
+    const timer = window.setTimeout(() => { readLocation(); setNavReady(true); }, 0);
+    window.addEventListener("hashchange", readLocation);
+    return () => { window.clearTimeout(timer); window.removeEventListener("hashchange", readLocation); };
+  }, []);
+  useEffect(() => {
+    if (!navReady) return;
+    const hash = `#${navSlug(activeNav)}`;
+    if (window.location.hash !== hash) window.history.replaceState(null, "", hash);
+  }, [activeNav, navReady]);
 
   const visible = useMemo(() => {
     const filtered = candidates.filter((candidate) => {
@@ -108,19 +126,27 @@ export default function Home() {
 
   const focused = candidates.find((item) => item.compound_id === focusId) ?? visible[0];
 
-  async function runEngine() {
+  async function runEngine(runId?: string) {
     setEngineState("running");
     setExperiment(null);
+    setCandidates([]);
+    setRankingRunId("");
     try {
       await checkBackend();
+      const history = await listRankingRuns();
+      const selectedRun = runId === "new" ? null : (runId ?? history.find((item) => item.model_version === "osiel-research-sim@1.0")?.ranking_run_id ?? null);
       const [result, health, runtimeModels] = await Promise.all([
-        loadRankedWorkspace(cancerType, cellLine, origin),
+        selectedRun ? loadRankingRun(selectedRun) : loadRankedWorkspace(cancerType, cellLine, origin),
         getBackendJson<{ compound_count: number }>("/health"),
         getBackendJson<typeof models>("/v1/models"),
       ]);
+      setRunHistory((selectedRun ? history : await listRankingRuns()).filter((item) => item.model_version === "osiel-research-sim@1.0"));
+      if (selectedRun) {
+        const previous = history.find((item) => item.ranking_run_id === selectedRun);
+        if (previous) { setCancerType(previous.cancer_type); setCellLine(previous.cell_line || "A549"); }
+      }
       setCandidates(result.candidates);
       setRankingRunId(result.rankingRunId);
-      setBackendConnected(true);
       setConnectionState("connected");
       setCompoundCount(health.compound_count);
       setModels(runtimeModels);
@@ -135,10 +161,9 @@ export default function Home() {
       setRankingRunId("");
       setCompoundCount(null);
       setModels([]);
-      setBackendConnected(false);
       setConnectionState("unavailable");
       console.error("Research engine request failed", error);
-      setEngineMessage("Research engine unavailable. Retry the connection when the service is restored.");
+      setEngineMessage("Research workspace is temporarily unavailable. Retry when service is restored.");
       setEngineState("ready");
     }
   }
@@ -154,15 +179,12 @@ export default function Home() {
     if (selected.size === 0) return null;
     setExperiment(null);
     setExperimentStage(0);
-    const interval = window.setInterval(() => setExperimentStage((stage) => Math.min(stage + 1, 3)), 460);
     try {
       const result = await runDryExperiment([...selected], cancerType, cellLine, rankingRunId);
-      window.clearInterval(interval);
       setExperimentStage(4);
       setExperiment(result);
       return result;
     } catch (error) {
-      window.clearInterval(interval);
       setExperimentStage(-1);
       setExperiment(null);
       setEngineMessage(error instanceof Error ? error.message : "Experiment service unavailable.");
@@ -196,7 +218,7 @@ export default function Home() {
           <button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation"><Icon name="menu"/></button>
           <div className="breadcrumb"><span>OSIEL</span><Icon name="chevron" size={13}/><b>{activeNav}</b></div>
           <label className="global-search"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search compounds, IDs, evidence…"/><kbd>⌘ K</kbd></label>
-          <div className="top-actions"><div className={`connection ${backendConnected ? "live" : "demo"}`}><span/>{connectionState === "connected" ? "Research engine connected" : connectionState === "connecting" ? "Connecting…" : "Research engine unavailable"}</div><div className="avatar small">OS</div></div>
+          <div className="top-actions"><div className="avatar small">OS</div></div>
         </header>
 
         <div className="page-content">
@@ -210,10 +232,10 @@ export default function Home() {
           /> : <>
           <section className="page-heading">
             <div><div className="eyebrow"><span>OSIEL / DISCOVERY</span><Badge tone="violet">Computational hypothesis</Badge></div><h1>Compound Prioritization Cockpit</h1><p>Traceable chemical intelligence, uncertainty-aware ranking, and governed experimental learning in one research loop.</p></div>
-            <div className="heading-actions"><button className="secondary" disabled={!rankingRunId} title={!rankingRunId ? "Run a ranking before exporting" : "Download the current ranking as JSON"} onClick={() => { const blob = new Blob([JSON.stringify({ rankingRunId, cancerType, cellLine, candidates }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${rankingRunId}.json`; link.click(); URL.revokeObjectURL(url); }}><Icon name="download"/> Export run</button><button className="primary" onClick={runEngine} disabled={engineState === "running"}><Icon name={engineState === "running" ? "activity" : "play"}/>{engineState === "running" ? "Running OSIEL…" : "Run OSIEL engine"}</button></div>
+            <div className="heading-actions">{rankingRunId ? <a className="secondary" role="button" href={rankingExportUrl(rankingRunId)} download={`osiel-ranking-${rankingRunId}.json`} title="Download the current ranking as JSON"><Icon name="download"/> Export run</a> : <button className="secondary" disabled title="Run a ranking before exporting"><Icon name="download"/> Export run</button>}<button className="primary" onClick={() => void runEngine("new")} disabled={engineState === "running"}><Icon name={engineState === "running" ? "activity" : "play"}/>{engineState === "running" ? "Analyzing candidates…" : "Run OSIEL engine"}</button></div>
           </section>
 
-          {connectionState === "unavailable" && <section className="notice-bar"><Icon name="shield"/><div><b>Backend unavailable.</b> Scientific services are currently unavailable.</div><button onClick={() => void runEngine()}>Retry connection</button></section>}
+          {connectionState === "unavailable" && <section className="notice-bar"><Icon name="shield"/><div><b>Research workspace is temporarily unavailable.</b> Please retry.</div><button onClick={() => void runEngine()}>Retry</button></section>}
           <section className="notice-bar"><Icon name="shield"/><div><b>Research-use system.</b> Rankings are in-silico prioritization hypotheses—not clinical guidance or measured efficacy.</div><button onClick={() => setActiveNav("Model governance")}>View claim boundaries</button></section>
 
           <section className="context-card">
@@ -221,19 +243,20 @@ export default function Home() {
             <div className="context-grid">
               <label><span>Cancer context</span><select value={cancerType} onChange={(event) => setCancerType(event.target.value)}><option>Non-small cell lung cancer</option><option>Triple-negative breast cancer</option><option>Colorectal adenocarcinoma</option><option>Pancreatic ductal adenocarcinoma</option></select></label>
               <label><span>Cell line</span><select value={cellLine} onChange={(event) => setCellLine(event.target.value)}><option>A549</option><option>H1975</option><option>HCC827</option><option>MDA-MB-231</option></select></label>
-              <label><span>Endpoint</span><select defaultValue="activity_probability"><option value="activity_probability">Activity probability</option><option value="IC50">IC50 (separate task)</option><option value="GI50">GI50 (separate task)</option></select></label>
+              <label><span>Endpoint</span><select value="activity_probability" disabled title="This research model evaluates activity probability; IC50 is reported as a computational estimate."><option value="activity_probability">Activity probability</option></select></label>
               <div className="segmented-field"><span>Candidate origin</span><div>{(["all", "natural", "synthetic"] as const).map((value) => <button key={value} className={origin === value ? "active" : ""} onClick={() => setOrigin(value)}>{value === "all" ? "All" : value[0].toUpperCase() + value.slice(1)}</button>)}</div></div>
             </div>
-            <div className="context-meta"><span><i className="dot green"/> Task <b>{cancerType} · {cellLine}</b></span><span>Model domain: <b>backend reported</b></span><span>Ranking: <b>{rankingRunId || "not run"}</b></span><span>Updated: <b>{backendConnected ? "backend connected" : "unavailable"}</b></span></div>
+            <div className="context-meta"><span><i className="dot green"/> Task <b>{cancerType} · {cellLine}</b></span><span>Model domain: <b>reported per candidate</b></span><span>Ranking: <b>{rankingRunId || "not run"}</b></span></div>
           </section>
 
           <section className="metrics-grid">
-            <Metric label="BACKEND COMPOUND REGISTRY" value={compoundCount === null ? "—" : String(compoundCount)} detail="Backend registry compounds" tone="mint"/>
+            <Metric label="REFERENCE COMPOUNDS" value={compoundCount === null ? "—" : String(compoundCount)} detail="Research registry" tone="mint"/>
             <Metric label="CANDIDATES IN VIEW" value={String(visible.length)} detail={`${visible.filter((item) => item.applicability_domain === "inside").length} inside model domain`} tone="cyan"/>
-            <Metric label="TOP-5 MEAN SCORE" value={candidates.length ? `${topMean}/100` : "—"} detail="Backend ranking scores" tone="violet"/>
+            <Metric label="TOP-5 MEAN SCORE" value={candidates.length ? `${topMean}/100` : "—"} detail="Computational ranking" tone="violet"/>
             <Metric label="EXPERIMENT QUEUE" value={String(selected.size)} detail="Selected for computational dry-run" tone="amber"/>
           </section>
 
+          {runHistory.length > 0 && <section className="module-card"><div className="section-heading"><div><span>RESEARCH MEMORY</span><h2>Recent analysis runs</h2></div></div><div className="context-meta">{runHistory.slice(0, 5).map((run) => <button className="secondary" key={run.ranking_run_id} disabled={engineState === "running"} onClick={() => void runEngine(run.ranking_run_id)}>{run.ranking_run_id} · {run.cell_line || run.cancer_type} · {run.candidate_count} candidates · {new Date(run.created_at).toLocaleTimeString()}</button>)}</div></section>}
           <section className="workflow-card">
             <div className="section-heading"><div><span>END-TO-END ENGINE</span><h2>Evidence-to-experiment loop</h2></div><div className={`run-state ${engineState}`}><i/>{engineState === "running" ? "Processing" : engineState === "complete" ? "Run complete" : "Ready"}</div></div>
             <div className="workflow">
@@ -259,9 +282,9 @@ export default function Home() {
                     <td><button className="row-arrow" aria-label={`Open ${candidate.display_name}`} onClick={(event) => { event.stopPropagation(); setFocusId(candidate.compound_id); }}><Icon name="chevron" size={16}/></button></td>
                   </tr>)}</tbody>
                 </table>
-                {visible.length === 0 && <div className="empty-state"><Icon name="search"/><b>{connectionState === "unavailable" ? "Backend unavailable" : "No compounds match this view"}</b><span>{connectionState === "unavailable" ? "Scientific services are currently unavailable. Retry connection." : "Clear the search or change candidate origin."}</span></div>}
+                {visible.length === 0 && <div className="empty-state"><Icon name="search"/><b>{connectionState === "unavailable" ? "Research workspace unavailable" : "No compounds match this view"}</b><span>{connectionState === "unavailable" ? "Please retry when the workspace is available." : "Clear the search or change candidate origin."}</span></div>}
               </div>
-              <div className="table-footer"><span>Showing {visible.length} backend-ranked candidates</span><span><i className="dot purple"/> Selected: <b>{selected.size}</b></span></div>
+              <div className="table-footer"><span>Showing {visible.length} ranked candidates</span><span><i className="dot purple"/> Selected: <b>{selected.size}</b></span></div>
             </div>
 
             {focused ? <aside className="candidate-card card">
@@ -271,7 +294,7 @@ export default function Home() {
               {detailTab === "overview" && <div className="detail-panel"><div className="prediction-callout"><span>Predicted IC50</span><strong>{focused.predicted_ic50_um.toFixed(2)} <small>µM</small></strong><Badge tone={focused.confidence >= 75 ? "mint" : "amber"}>{focused.confidence}% confidence</Badge></div><ScoreBar label="Predicted activity" value={focused.activity}/><ScoreBar label="Selectivity" value={focused.selectivity} tone="cyan"/><ScoreBar label="Model confidence" value={focused.confidence} tone="mint"/><div className="detail-note"><Icon name="robot"/><p>{focused.note}</p></div></div>}
               {detailTab === "evidence" && <div className="detail-panel"><div className="evidence-grade"><b>{focused.evidence_grade}</b><div><span>Evidence grade</span><strong>{focused.evidence_grade === "A" ? "Curated reference" : focused.evidence_grade === "B" ? "Verified identity" : "Limited context"}</strong></div></div><dl className="evidence-list"><div><dt>Source</dt><dd>{focused.source}</dd></div><div><dt>Model domain</dt><dd>{focused.applicability_domain}</dd></div><div><dt>Uncertainty</dt><dd>{focused.uncertainty}%</dd></div><div><dt>Claim type</dt><dd>In-silico hypothesis</dd></div></dl><button className="wide-secondary" onClick={() => setActiveNav("Audit & lineage")}><Icon name="book"/> Inspect lineage record</button></div>}
               {detailTab === "admet" && <div className="detail-panel admet-list">{focused.admet.map((endpoint) => <div key={endpoint.code}><div className={`admet-symbol ${endpoint.className}`}>{endpoint.label[0]}</div><div><span>{endpoint.label}</span><b>{endpoint.value}/100</b></div><Badge tone={endpoint.className === "good" ? "mint" : endpoint.className === "risk" ? "red" : "amber"}>{endpoint.className}</Badge></div>)}<p>Backend-provided endpoint estimates are separate research hypotheses. Production adapters target ADMET-AI or validated endpoint models.</p></div>}
-            </aside> : <aside className="candidate-card card"><div className="empty-state">Select a backend candidate to inspect its results.</div></aside>}
+            </aside> : <aside className="candidate-card card"><div className="empty-state">Select a candidate to inspect its results.</div></aside>}
           </section>
 
           <section className="lower-grid">
@@ -285,7 +308,7 @@ export default function Home() {
 
             <article className="governance-card card">
               <div className="section-heading"><div><span>MODEL GOVERNANCE</span><h2>Champion / challenger gate</h2></div><Icon name="shield"/></div>
-              <div className="model-row champion"><div className="model-badge"><Icon name="check"/></div><div><span>CHAMPION</span><b>{models.find((model) => model.alias === "champion")?.name ?? "No model configured"}</b><small>{models.some((model) => model.alias === "champion" && model.metrics?.validated) ? "Validated" : "Development reference · not validated"}</small></div><Badge tone="amber">Research only</Badge></div>
+              <div className="model-row champion"><div className="model-badge"><Icon name="check"/></div><div><span>RESEARCH MODEL</span><b>{models.find((model) => model.alias === "research")?.name ?? "No research model configured"}</b><small>Computational simulation · independent validation required</small></div><Badge tone="amber">Research only</Badge></div>
               <div className="model-divider"><span>Evaluation boundary</span></div>
               <div className="model-row"><div className="model-badge challenger"><Icon name="activity"/></div><div><span>CHALLENGER</span><b>Awaiting approved dataset</b><small>Training never starts from a UI upload</small></div><Badge>Locked</Badge></div>
               <ul className="gate-list"><li><Icon name="check"/> Scientific result approval required</li><li><Icon name="check"/> Immutable snapshot and leakage audit</li><li><Icon name="check"/> Independent evaluation and named reviewer</li></ul>

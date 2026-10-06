@@ -17,6 +17,15 @@ class ModelGovernanceService:
         now = datetime.now(UTC).isoformat()
         records = [
             (
+                "MDL-RESEARCH-SIM-1",
+                "OSIEL Research Activity Model",
+                "1.0",
+                "research",
+                "active-research-simulation",
+                {"validated": False, "model_class": "synthetic_research_simulation", "validation_status": "unvalidated", "intended_use": "research_showcase"},
+                "reference-molecular-registry",
+            ),
+            (
                 "MDL-DEMO-CHAMPION",
                 "osiel-demo-baseline",
                 "1.0.0",
@@ -115,4 +124,3 @@ class ModelGovernanceService:
             "deployment_started": False,
             "reason": reason,
         }
-

@@ -114,9 +114,10 @@ export function ProfessorAI({
     setUploadMessage(
       result.document.status === "quarantined"
         ? `Quarantined ${result.document.title}; prompt-like instructions were detected and it will not be retrieved.`
-        : `Indexed ${result.document.title}: ${result.document.page_count} pages, ${result.document.chunk_count} immutable chunks.`,
+        : `Indexed ${result.document.title}: ${result.document.page_count} ${result.document.page_count === 1 ? "page" : "pages"}, ${result.document.chunk_count} immutable ${result.document.chunk_count === 1 ? "chunk" : "chunks"}.`,
     );
     setDocuments(await listProfessorDocuments(projectScope, courseScope));
+    setCapabilities(await loadProfessorCapabilities());
     setSelectedDocuments((items) => new Set([...items, result.document!.document_id]));
   }
 
@@ -147,14 +148,14 @@ export function ProfessorAI({
       ? `Local ${serverAnswer.model || "Qwen"} · curated cited RAG`
       : serverAnswer
         ? "Evidence review · research engine"
-        : capabilities ? "Awaiting a question" : "Research engine unavailable";
+        : capabilities ? "Awaiting a question" : "Project evidence unavailable";
 
   return <>
     <section className="module-heading">
       <div><span>ANALYZE / PROFESSOR AI</span><h1>Governed scientific professor</h1><p>Upload approved research, retrieve page-level evidence, and preserve scientific review.</p></div>
       <div className="professor-live-summary">
-        <b>{capabilities ? "Research engine connected" : "Research engine unavailable"}</b>
-        <span>{capabilities?.document_count ?? 0} documents · {capabilities?.chunk_count ?? 0} chunks</span>
+        <b>{capabilities ? "Project evidence available" : "Project evidence unavailable"}</b>
+        <span>{capabilities?.document_count ?? 0} {(capabilities?.document_count ?? 0) === 1 ? "document" : "documents"} · {capabilities?.chunk_count ?? 0} {(capabilities?.chunk_count ?? 0) === 1 ? "chunk" : "chunks"}</span>
       </div>
     </section>
 
@@ -171,8 +172,8 @@ export function ProfessorAI({
     {view === "library" ? <div className="professor-library-grid">
       <article className="module-card professor-upload">
         <span>PROJECT KNOWLEDGE</span>
-        <h2>Add research material</h2>
-        <p>Upload papers, protocols, study documents, experimental notes, or reports in PDF, TXT, or Markdown. The research engine validates and indexes approved content for evidence retrieval.</p>
+        <h2>Bring existing project material into the workspace</h2>
+        <p>Add scientific papers, study reports, protocols, experimental notes, previous analyses, and project documentation. PDF, TXT, and Markdown files up to 20 MB can be indexed when rights are confirmed. Indexing makes a document searchable; it does not make its claims scientifically approved.</p>
         <label>Project scope<input value={projectScope} onChange={(event) => setProjectScope(event.target.value)} /></label>
         <label>Course scope<input value={courseScope} onChange={(event) => setCourseScope(event.target.value)} /></label>
         <label>Paper or document<input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next && !documentTitle) setDocumentTitle(next.name.replace(/\.[^.]+$/, "")); }} /></label>
@@ -189,12 +190,12 @@ export function ProfessorAI({
         <span>SCOPED CORPUS</span><h2>Reviewable source versions</h2>
         {documents.length === 0 ? <div className="empty-professor">No project documents have been added yet. Upload research material to build the project knowledge base.</div> : documents.map((document) => <label className={`professor-document ${document.status}`} key={document.document_id}>
           <input type="checkbox" disabled={document.status !== "indexed"} checked={selectedDocuments.has(document.document_id)} onChange={() => setSelectedDocuments((items) => { const next = new Set(items); if (next.has(document.document_id)) next.delete(document.document_id); else next.add(document.document_id); return next; })} />
-          <div><b>{document.title}</b><span>{document.page_count} pages · {document.chunk_count} chunks · {document.embedding_model || "FTS5 lexical"}</span><small>SHA {document.raw_sha256.slice(0, 16)}… · {document.source_version}</small>{document.prompt_injection_flags.length > 0 && <em>Quarantined: {document.prompt_injection_flags.join(", ")}</em>}</div>
+          <div><b>{document.title}</b><span>{document.status} · {document.page_count} {document.page_count === 1 ? "page" : "pages"} · {document.chunk_count} {document.chunk_count === 1 ? "chunk" : "chunks"} · {document.embedding_model || "text search"}</span><small>SHA {document.raw_sha256.slice(0, 16)}… · {document.source_version}</small>{document.prompt_injection_flags.length > 0 && <em>Quarantined: {document.prompt_injection_flags.join(", ")}</em>}</div>
         </label>)}
       </article>
     </div> : <div className="module-grid professor-grid">
       <article className="module-card professor-question">
-        <span>ASK A SUPERVISOR-STYLE QUESTION</span>
+        <span>ASK ACROSS PROJECT EVIDENCE</span><p>Ask questions across the evidence available to this project. Retrieved passages are shown below the response for review.</p>
         <div className="professor-scope-row"><label>Project<input value={projectScope} onChange={(event) => setProjectScope(event.target.value)} /></label><label>Course<input value={courseScope} onChange={(event) => setCourseScope(event.target.value)} /></label></div>
         <textarea value={question} onChange={(event) => setQuestion(event.target.value)} aria-label="Question for Professor AI" />
         <div className="prompt-chips">{quickPrompts.map((prompt) => <button key={prompt} onClick={() => void ask(prompt)} disabled={Boolean(busy)}>{prompt}</button>)}</div>

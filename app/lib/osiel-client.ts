@@ -2,6 +2,10 @@ import type { RankedCandidate } from "./ranked-candidate";
 
 const API_BASE = (process.env.NEXT_PUBLIC_OSIEL_API_URL ?? "").replace(/\/$/, "");
 
+export function rankingExportUrl(runId: string): string {
+  return `${API_BASE}/v1/rankings/${encodeURIComponent(runId)}/export`;
+}
+
 export class OsielApiError extends Error {
   constructor(public readonly title: string, message: string, public readonly status?: number) {
     super(message);
@@ -152,10 +156,22 @@ export type WorkspaceResult = {
   message: string;
 };
 
+export type RankingRunSummary = { ranking_run_id: string; cancer_type: string; cell_line: string | null; created_at: string; candidate_count: number; model_version: string };
+
+export async function listRankingRuns(): Promise<RankingRunSummary[]> {
+  return getBackendJson<RankingRunSummary[]>("/v1/rankings?limit=12");
+}
+
+export async function loadRankingRun(runId: string): Promise<WorkspaceResult> {
+  const ranking = await getBackendJson<ApiRankingRun>(`/v1/rankings/${encodeURIComponent(runId)}`);
+  return mapRankingRun(ranking);
+}
+
 export type DryRunResult = {
   experimentId: string;
   resultId: string;
   qcStatus: string;
+  qcChecks?: Record<string, boolean>;
   observationCount: number;
   estimatedIc50: Record<string, number>;
   backendConnected: boolean;
@@ -185,7 +201,7 @@ export type CompoundConformer3D = {
 };
 
 async function apiFetch(path: string, init?: RequestInit, timeoutMs = 30_000): Promise<Response> {
-  if (!API_BASE) throw new OsielApiError("Backend unavailable", "NEXT_PUBLIC_OSIEL_API_URL is not configured.");
+  if (!API_BASE) throw new OsielApiError("Research workspace unavailable", "Research services are not configured for this workspace.");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -195,7 +211,8 @@ async function apiFetch(path: string, init?: RequestInit, timeoutMs = 30_000): P
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     });
   } catch (error) {
-    throw new OsielApiError("Backend unavailable", error instanceof Error ? error.message : "Network request failed.");
+    console.error("Research request failed", { path, error });
+    throw new OsielApiError("Research workspace unavailable", "The requested research service is temporarily unavailable. Please retry.");
   } finally {
     clearTimeout(timeout);
   }
@@ -262,7 +279,13 @@ export async function loadRankedWorkspace(
     });
     if (!response.ok) throw new Error(`Ranking API returned ${response.status}`);
     const ranking = (await response.json()) as ApiRankingRun;
-    const byId = new Map(candidates.map((item) => [item.compound_id, item]));
+    return mapRankingRun(ranking, candidates);
+  }
+}
+
+async function mapRankingRun(ranking: ApiRankingRun, knownCompounds?: ApiCompound[]): Promise<WorkspaceResult> {
+    const compounds = knownCompounds ?? await getBackendJson<ApiCompound[]>("/v1/compounds?limit=200");
+    const byId = new Map(compounds.map((item) => [item.compound_id, item]));
     const mapped = ranking.ranked.map((item): RankedCandidate => {
       const compound = byId.get(item.compound_id);
       return {
@@ -280,7 +303,7 @@ export async function loadRankedWorkspace(
         evidence_grade: compound?.evidence_grade ?? "D",
         applicability_domain: item.prediction.applicability_domain,
         source: compound?.source_name ?? "OSIEL compound registry",
-        note: item.hard_filter_reasons[0] ?? item.prediction.evidence_summary,
+        note: (item.hard_filter_reasons[0] ?? item.prediction.evidence_summary).replace("Curated demo panel", "Curated reference panel"),
         admet: item.prediction.admet.slice(0, 4).map((endpoint) => ({
           code: endpoint.code,
           label: endpoint.label,
@@ -293,10 +316,8 @@ export async function loadRankedWorkspace(
       candidates: mapped,
       backendConnected: true,
       rankingRunId: ranking.ranking_run_id,
-      message: `Research engine ranked ${mapped.length} compounds.`,
+      message: `${mapped.length} candidates analyzed for this research context.`,
     };
-
-  }
 }
 
 export async function runDryExperiment(
@@ -335,12 +356,14 @@ export async function runDryExperiment(
       observations: unknown[];
       estimated_ic50_um: Record<string, number>;
       qc_status: string;
+      qc_checks: Record<string, boolean>;
       disclaimer: string;
     };
     return {
       experimentId: experiment.experiment_id,
       resultId: result.result_id,
       qcStatus: result.qc_status,
+      qcChecks: result.qc_checks,
       observationCount: result.observations.length,
       estimatedIc50: result.estimated_ic50_um,
       backendConnected: true,
@@ -476,8 +499,8 @@ export async function runOpenDiscovery(input: OpenDiscoveryInput): Promise<OpenD
       ...result,
       backendConnected: true,
       modeMessage: result.execution_mode === "local-python-plus-public-apis"
-        ? "Python/RDKit engine completed with operator-enabled official public APIs."
-        : "Python/RDKit engine completed against the versioned local reference registry.",
+        ? "Local analysis and enabled public-source retrieval completed. Review the source ledger for evidence status."
+        : "Local chemistry analysis completed against the versioned reference registry. External evidence was not fetched.",
     };
 
   }
@@ -801,7 +824,7 @@ export async function askScientificProfessor(
     return {
       answer: null,
       backendConnected: false,
-      error: "Backend unavailable. Scientific Professor cannot answer right now.",
+      error: "Project evidence search is temporarily unavailable.",
     };
   }
 }
@@ -851,11 +874,11 @@ export async function ingestProfessorDocument(
     courseScope: string;
   },
 ): Promise<{ document: ProfessorDocument | null; error: string | null }> {
-  const mediaType = file.type === "application/pdf"
-    ? "application/pdf"
-    : file.name.toLowerCase().endsWith(".md")
-      ? "text/markdown"
-      : "text/plain";
+  const extension = file.name.toLowerCase().split(".").pop();
+  const mediaType = extension === "pdf" ? "application/pdf" : extension === "md" ? "text/markdown" : extension === "txt" ? "text/plain" : null;
+  if (!mediaType) return { document: null, error: "Choose a PDF, TXT, or Markdown document." };
+  if (file.size === 0) return { document: null, error: "The selected document is empty." };
+  if (file.size > 20 * 1024 * 1024) return { document: null, error: "The selected document exceeds the 20 MB upload limit." };
   try {
     const response = await apiFetch("/v1/assistant/documents", {
       method: "POST",
@@ -883,7 +906,7 @@ export async function ingestProfessorDocument(
     }
     return { document: await response.json() as ProfessorDocument, error: null };
   } catch {
-    return { document: null, error: "The Python document-ingestion engine is unavailable." };
+    return { document: null, error: "Project document ingestion is currently unavailable. Please retry." };
   }
 }
 
@@ -914,7 +937,7 @@ export async function submitProfessorFeedback(
     const payload = await response.json() as { feedback_id: string };
     return { feedbackId: payload.feedback_id, error: null };
   } catch {
-    return { feedbackId: null, error: "The Python feedback service is unavailable." };
+    return { feedbackId: null, error: "Feedback could not be recorded right now." };
   }
 }
 
@@ -1042,7 +1065,7 @@ export async function getModelLabCapabilities(): Promise<{ capabilities: ModelLa
     if (!response.ok) return { capabilities: null, backendConnected: true, error: await responseDetail(response) };
     return { capabilities: await response.json() as ModelLabCapabilities, backendConnected: true, error: null };
   } catch {
-    return { capabilities: null, backendConnected: false, error: "Model laboratory unavailable. Check the research engine connection." };
+    return { capabilities: null, backendConnected: false, error: "Model laboratory is temporarily unavailable." };
   }
 }
 
@@ -1065,7 +1088,7 @@ export async function createChemblSnapshot(input: {
     if (!response.ok) return { snapshot: null, backendConnected: true, error: await responseDetail(response) };
     return { snapshot: await response.json() as ActivityDatasetSnapshot, backendConnected: true, error: null };
   } catch {
-    return { snapshot: null, backendConnected: false, error: "The Python/ChEMBL model-lab service is not connected. No dataset was fabricated." };
+    return { snapshot: null, backendConnected: false, error: "The model laboratory cannot load a dataset right now." };
   }
 }
 
@@ -1085,7 +1108,7 @@ export async function trainActivityModel(snapshotId: string): Promise<{ run: Act
     if (!response.ok) return { run: null, backendConnected: true, error: await responseDetail(response) };
     return { run: await response.json() as ActivityModelRun, backendConnected: true, error: null };
   } catch {
-    return { run: null, backendConnected: false, error: "The Python model worker is not connected. No evaluation metrics were simulated." };
+    return { run: null, backendConnected: false, error: "Model training is unavailable in this environment." };
   }
 }
 
@@ -1107,7 +1130,7 @@ export async function proposeActiveLearning(
     if (!response.ok) return { batch: null, backendConnected: true, error: await responseDetail(response) };
     return { batch: await response.json() as ActiveLearningBatch, backendConnected: true, error: null };
   } catch {
-    return { batch: null, backendConnected: false, error: "The Python active-learning service is not connected. No priorities were fabricated." };
+    return { batch: null, backendConnected: false, error: "Active learning is unavailable in this environment." };
   }
 }
 
@@ -1149,7 +1172,7 @@ export async function runDockingBenchmark(input: {
     if (!response.ok) return { benchmark: null, backendConnected: true, error: await responseDetail(response) };
     return { benchmark: await response.json() as DockingBenchmarkRun, backendConnected: true, error: null };
   } catch {
-    return { benchmark: null, backendConnected: false, error: "The Python benchmark service is not connected. No RMSD was simulated." };
+    return { benchmark: null, backendConnected: false, error: "The docking benchmark is unavailable in this environment." };
   }
 }
 
@@ -1226,7 +1249,7 @@ export async function runMultimodalResearchCase(input: {
     return {
       result: null,
       backendConnected: false,
-      error: "The Python multimodal orchestrator is not connected. OSIEL stopped safely and generated no scientific conclusion.",
+      error: "Multimodal analysis is unavailable in this environment. No scientific conclusion was generated.",
     };
   }
 }

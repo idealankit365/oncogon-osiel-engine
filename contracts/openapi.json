@@ -2095,14 +2095,14 @@
         "summary": "Create Ranking",
         "operationId": "create_ranking_v1_rankings_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RankingRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -2112,6 +2112,126 @@
                 "schema": {
                   "$ref": "#/components/schemas/RankingRun"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List Rankings",
+        "operationId": "list_rankings_v1_rankings_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RankingRun"
+                  },
+                  "title": "Response List Rankings V1 Rankings Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/rankings/{run_id}": {
+      "get": {
+        "summary": "Get Ranking",
+        "operationId": "get_ranking_v1_rankings__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RankingRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/rankings/{run_id}/export": {
+      "get": {
+        "summary": "Export Ranking",
+        "operationId": "export_ranking_v1_rankings__run_id__export_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -2211,6 +2331,49 @@
                     "$ref": "#/components/schemas/Experiment"
                   },
                   "title": "Response List Experiments V1 Experiments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/experiments/{experiment_id}/results": {
+      "get": {
+        "summary": "List Experiment Results",
+        "operationId": "list_experiment_results_v1_experiments__experiment_id__results_get",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExperimentResult"
+                  },
+                  "title": "Response List Experiment Results V1 Experiments  Experiment Id  Results Get"
                 }
               }
             }
@@ -8197,6 +8360,53 @@
           "cancer_type": {
             "type": "string",
             "title": "Cancer Type"
+          },
+          "cell_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cell Line"
+          },
+          "simulation_seed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simulation Seed"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version",
+            "default": "osiel-demo-baseline-1.0.0"
+          },
+          "model_class": {
+            "type": "string",
+            "title": "Model Class",
+            "default": "development_reference"
+          },
+          "validation_status": {
+            "type": "string",
+            "title": "Validation Status",
+            "default": "unvalidated"
+          },
+          "intended_use": {
+            "type": "string",
+            "title": "Intended Use",
+            "default": "research_showcase"
+          },
+          "result_type": {
+            "type": "string",
+            "title": "Result Type",
+            "default": "computational_research_simulation"
           },
           "weights": {
             "$ref": "#/components/schemas/RankingWeights"

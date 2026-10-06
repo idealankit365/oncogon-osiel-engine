@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import secrets
 from datetime import UTC, datetime
 
 from .config import settings
@@ -13,6 +14,7 @@ from .schemas import (
     RankingRun,
     ScoreComponent,
 )
+from .synthetic_model import MODEL_VERSION
 
 
 class RankingService:
@@ -20,10 +22,25 @@ class RankingService:
         self.repository = repository
         self.predictor = predictor
 
+    def get(self, run_id: str) -> RankingRun | None:
+        with self.repository.connection() as connection:
+            row = connection.execute(
+                "SELECT payload_json FROM ranking_run WHERE ranking_run_id = ?", (run_id,)
+            ).fetchone()
+        return RankingRun.model_validate_json(row["payload_json"]) if row else None
+
+    def list(self, limit: int = 20) -> list[RankingRun]:
+        with self.repository.connection() as connection:
+            rows = connection.execute(
+                "SELECT payload_json FROM ranking_run ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [RankingRun.model_validate_json(row["payload_json"]) for row in rows]
+
     def rank(self, request: RankingRequest) -> RankingRun:
         compounds = self.repository.get_compounds(request.compound_ids)
         if len(compounds) < 2:
             raise ValueError("At least two resolvable compounds are required")
+        seed = secrets.token_hex(16)
 
         provisional: list[tuple[Compound, object, list[ScoreComponent], list[str], str]] = []
         for compound in compounds:
@@ -31,11 +48,12 @@ class RankingService:
                 compound,
                 cancer_type=request.cancer_type,
                 cell_line=request.cell_line,
+                run_seed=seed,
             )
             hard_reasons: list[str] = []
             eligibility = "eligible"
             if prediction.applicability_domain == "outside":
-                hard_reasons.append("Outside demo model applicability domain")
+                hard_reasons.append("Outside research model applicability domain")
                 eligibility = "flagged"
             if compound.descriptors.molecular_weight > 900:
                 hard_reasons.append("Molecular weight exceeds Phase-1 policy threshold")
@@ -66,7 +84,7 @@ class RankingService:
                     rank=rank_index,
                     compound_id=compound.compound_id,
                     display_name=compound.display_name,
-                    score=round(scores[candidate_index], 2),
+                    score=round(max(0.0, min(100.0, scores[candidate_index])), 2),
                     pareto_front=1 if rank_index <= max(1, len(order) // 3) else 2,
                     eligibility=eligibility,
                     hard_filter_reasons=hard_reasons,
@@ -79,6 +97,10 @@ class RankingService:
             ranking_run_id=self.repository.new_id("RNK"),
             policy_version=settings.ranking_policy_version,
             cancer_type=request.cancer_type,
+            cell_line=request.cell_line,
+            simulation_seed=seed,
+            model_version=MODEL_VERSION,
+            model_class="synthetic_research_simulation",
             weights=request.weights,
             candidate_count=len(ranked),
             ranked=ranked,
@@ -96,7 +118,7 @@ class RankingService:
             "ranking.completed",
             "ranking_run",
             run.ranking_run_id,
-            {"policy_version": run.policy_version, "candidate_count": len(ranked)},
+            {"policy_version": run.policy_version, "candidate_count": len(ranked), "model_version": MODEL_VERSION, "simulation_seed": seed},
         )
         return run
 
@@ -115,10 +137,10 @@ class RankingService:
         )
         evidence_map = {"A": 0.95, "B": 0.8, "C": 0.62, "D": 0.4}
         values = [
-            ("activity", "Predicted activity", prediction.predicted_activity, weights.activity, "Demo model activity hypothesis."),
+            ("activity", "Predicted activity", prediction.predicted_activity, weights.activity, "Research model activity hypothesis."),
             ("selectivity", "Predicted selectivity", min(1.0, prediction.predicted_selectivity_index / 30), weights.selectivity, "Normalized predicted selectivity index."),
             ("admet", "ADMET panel", admet_score, weights.admet, "Endpoint-specific developability screening panel."),
-            ("novelty", "Structural novelty", novelty, weights.novelty, "Stable demo novelty proxy; production uses training-set similarity."),
+            ("novelty", "Structural novelty", novelty, weights.novelty, "Stable structure proxy; training-set similarity requires validation."),
             ("feasibility", "Feasibility", feasibility, weights.feasibility, "QED and molecular flexibility proxy pending chemist review."),
             ("evidence", "Evidence quality", evidence_map[compound.evidence_grade], weights.evidence, "Identity/provenance evidence grade, not efficacy evidence."),
             ("uncertainty", "Uncertainty penalty", prediction.uncertainty, -weights.uncertainty_penalty, "Penalty for uncertainty and model-domain risk."),
@@ -134,4 +156,3 @@ class RankingService:
             )
             for code, label, value, weight, explanation in values
         ]
-

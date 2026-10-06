@@ -354,6 +354,13 @@ class RankingRun(BaseModel):
     ranking_run_id: str
     policy_version: str
     cancer_type: str
+    cell_line: str | None = None
+    simulation_seed: str | None = None
+    model_version: str = "osiel-demo-baseline-1.0.0"
+    model_class: str = "development_reference"
+    validation_status: str = "unvalidated"
+    intended_use: str = "research_showcase"
+    result_type: str = "computational_research_simulation"
     weights: RankingWeights
     candidate_count: int
     ranked: list[RankedCompound]

@@ -8,6 +8,7 @@ from .chemistry import chemistry
 from .config import settings
 from .repository import Repository
 from .schemas import ADMETEndpoint, AnalogEvidence, Compound, Prediction
+from .synthetic_model import simulate_prediction
 
 
 def _stable_unit_interval(*parts: str) -> float:
@@ -98,6 +99,7 @@ class DemoPredictionService:
         cancer_type: str,
         cell_line: str | None = None,
         endpoint: str = "activity_probability",
+        run_seed: str | None = None,
     ) -> Prediction:
         d = compound.descriptors
         hashed = _stable_unit_interval(compound.inchikey, cancer_type.lower(), cell_line or "")
@@ -148,6 +150,8 @@ class DemoPredictionService:
             ),
             created_at=datetime.now(UTC),
         )
+        if run_seed is not None:
+            prediction = simulate_prediction(prediction, run_seed)
         self.repository.save_json_record(
             "prediction",
             "prediction_id",
@@ -162,8 +166,8 @@ class DemoPredictionService:
             prediction.prediction_id,
             {
                 "compound_id": compound.compound_id,
-                "model_version": settings.model_version,
-                "demo_mode": True,
+                "model_version": prediction.model_version,
+                "result_type": "computational_research_simulation" if run_seed is not None else "development_reference_prediction",
             },
         )
         return prediction
@@ -193,4 +197,3 @@ class DemoPredictionService:
 
 def sigmoid(value: float) -> float:
     return 1 / (1 + math.exp(-value))
-

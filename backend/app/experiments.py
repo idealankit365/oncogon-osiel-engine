@@ -84,6 +84,16 @@ class ExperimentService:
             ]
         return [item for item in (self.get(value) for value in ids) if item]
 
+    def results(self, experiment_id: str) -> list[ExperimentResult]:
+        if self.get(experiment_id) is None:
+            raise KeyError("Experiment not found")
+        with self.repository.connection() as connection:
+            rows = connection.execute(
+                "SELECT payload_json FROM experiment_result WHERE experiment_id = ? ORDER BY created_at DESC",
+                (experiment_id,),
+            ).fetchall()
+        return [ExperimentResult.model_validate_json(row["payload_json"]) for row in rows]
+
     def simulate(self, experiment_id: str) -> ExperimentResult:
         experiment = self.get(experiment_id)
         if experiment is None:
@@ -255,4 +265,3 @@ def summarize_observations(result: ExperimentResult) -> dict[str, float]:
     for observation in result.observations:
         groups.setdefault(observation.compound_id, []).append(observation.viability_percent)
     return {compound_id: round(mean(values), 3) for compound_id, values in groups.items()}
-

@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
 from .assistant import ScientificAssistantService
 from .chemistry import StructureError, chemistry
@@ -617,6 +618,31 @@ def create_ranking(request: RankingRequest) -> RankingRun:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@app.get("/v1/rankings", response_model=list[RankingRun])
+def list_rankings(limit: int = Query(default=20, ge=1, le=100)) -> list[RankingRun]:
+    return ranker.list(limit)
+
+
+@app.get("/v1/rankings/{run_id}", response_model=RankingRun)
+def get_ranking(run_id: str) -> RankingRun:
+    run = ranker.get(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Ranking run not found")
+    return run
+
+
+@app.get("/v1/rankings/{run_id}/export")
+def export_ranking(run_id: str) -> Response:
+    run = ranker.get(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Ranking run not found")
+    return Response(
+        content=run.model_dump_json(indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="osiel-ranking-{run_id}.json"'},
+    )
+
+
 @app.post("/v1/experiments", response_model=Experiment, status_code=status.HTTP_201_CREATED)
 def create_experiment(
     request: ExperimentCreate,
@@ -631,6 +657,14 @@ def create_experiment(
 @app.get("/v1/experiments", response_model=list[Experiment])
 def list_experiments(limit: int = Query(default=50, ge=1, le=200)) -> list[Experiment]:
     return experiments.list(limit)
+
+
+@app.get("/v1/experiments/{experiment_id}/results", response_model=list[ExperimentResult])
+def list_experiment_results(experiment_id: str) -> list[ExperimentResult]:
+    try:
+        return experiments.results(experiment_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/v1/experiments/{experiment_id}/simulate", response_model=ExperimentResult)
