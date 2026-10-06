@@ -220,7 +220,7 @@ export async function loadCompoundConformer(
     return {
       conformer: await response.json() as CompoundConformer3D,
       backendConnected: true,
-      sourceLabel: "Live Python · RDKit ETKDGv3",
+      sourceLabel: "Research engine · RDKit ETKDGv3",
       error: null,
     };
   } catch {
@@ -235,7 +235,7 @@ export async function loadCompoundConformer(
       return {
         conformer,
         backendConnected: false,
-        sourceLabel: "Bundled Python-generated RDKit conformer",
+        sourceLabel: "Bundled RDKit-generated conformer",
         error: null,
       };
     } catch {
@@ -243,7 +243,7 @@ export async function loadCompoundConformer(
         conformer: null,
         backendConnected: false,
         sourceLabel: "Unavailable",
-        error: "No verified 3D conformer is available for this compound. Connect the Python API; no structure was fabricated.",
+        error: "No verified 3D conformer is available for this compound. Connect the scientific engine; no structure was fabricated.",
       };
     }
   }
@@ -319,14 +319,14 @@ export async function loadRankedWorkspace(
       candidates: mapped,
       backendConnected: true,
       rankingRunId: ranking.ranking_run_id,
-      message: `Python engine ranked ${mapped.length} compounds.`,
+      message: `Research engine ranked ${mapped.length} compounds.`,
     };
   } catch {
     return {
       candidates: fallbackFor(origin),
       backendConnected: false,
       rankingRunId: "RNK-EMBEDDED-DEMO",
-      message: "Embedded deterministic demo loaded. Set NEXT_PUBLIC_OSIEL_API_URL for live Python calls.",
+      message: "Reference analysis loaded. Connect the scientific engine for live calculations.",
     };
   }
 }
@@ -526,9 +526,9 @@ function fallbackOpenDiscovery(input: OpenDiscoveryInput): OpenDiscoveryResult {
       rank: index + 1,
       compound_id: `EMBEDDED-${String(index + 1).padStart(3, "0")}`,
       display_name: name,
-      source_name: "Embedded reference fixture",
+      source_name: "Bundled interface reference",
       source_record_id: `FIXTURE-${index + 1}`,
-      canonical_smiles: "Structure available from the connected Python engine",
+      canonical_smiles: "Structure available from the connected research engine",
       inchikey: `EMBEDDED-DEMO-${index + 1}`,
       similarity_to_seed: similarity,
       descriptors: { ...referenceDescriptors, qed },
@@ -539,23 +539,23 @@ function fallbackOpenDiscovery(input: OpenDiscoveryInput): OpenDiscoveryResult {
       quality_flags: [],
       priority_score: score,
       score_components: [
-        { code: "seed-similarity", label: "Seed similarity", normalized_value: similarity, weight: 0.45, contribution: Number((similarity * 45).toFixed(2)), explanation: "Embedded UI fixture; connect Python for a real RDKit Morgan similarity calculation." },
-        { code: "qed", label: "QED", normalized_value: qed, weight: 0.2, contribution: Number((qed * 20).toFixed(2)), explanation: "Embedded UI fixture; connect Python for a real RDKit QED calculation." },
-        { code: "lipinski", label: "Rule-of-Five adherence", normalized_value: 1, weight: 0.15, contribution: 15, explanation: "No example Rule-of-Five flag in this embedded fixture." },
-        { code: "alerts", label: "Alert burden", normalized_value: index === 3 ? 0.67 : 1, weight: 0.1, contribution: index === 3 ? 6.7 : 10, explanation: "Example catalogue status; connect Python for RDKit alert matching." },
+        { code: "seed-similarity", label: "Seed similarity", normalized_value: similarity, weight: 0.45, contribution: Number((similarity * 45).toFixed(2)), explanation: "Reference interface estimate; connect the scientific engine for RDKit Morgan similarity." },
+        { code: "qed", label: "QED", normalized_value: qed, weight: 0.2, contribution: Number((qed * 20).toFixed(2)), explanation: "Reference interface estimate; connect the scientific engine for RDKit QED." },
+        { code: "lipinski", label: "Rule-of-Five adherence", normalized_value: 1, weight: 0.15, contribution: 15, explanation: "No example Rule-of-Five flag in this reference set." },
+        { code: "alerts", label: "Alert burden", normalized_value: index === 3 ? 0.67 : 1, weight: 0.1, contribution: index === 3 ? 6.7 : 10, explanation: "Example catalogue status; connect the scientific engine for RDKit alert matching." },
         { code: "source-evidence", label: "Source evidence completeness", normalized_value: 0.75, weight: 0.1, contribution: 7.5, explanation: "Reference-fixture provenance only." },
       ],
       disposition: index < 2 ? "review" : index > 4 ? "deprioritize" : "review",
-      disposition_reason: "Embedded example only; rerun with the Python API before scientific review.",
+      disposition_reason: "Reference example only; rerun with the scientific engine before scientific review.",
     };
   });
   const stages = [
     ["target-evidence", "Resolve disease and target evidence", "Official Open Targets link prepared; no association data retrieved."],
     ["structure-resolution", "Resolve target structure", "No prepared receptor supplied; structure qualification remains open."],
-    ["seed-resolution", "Resolve and standardize seed ligand", `${input.seed_compound_name || "Seed"} fixture resolved for the hosted demonstration.`],
-    ["analogue-search", "Retrieve structural analogues", "Embedded reference panel loaded; public services were not crawled."],
-    ["standardization", "Standardize and deduplicate candidates", "Reference-fixture identities loaded; connect Python for RDKit computation."],
-    ["medchem-alerts", "Evaluate medicinal-chemistry alerts", "Example review flags displayed; connect Python for PAINS/Brenk/NIH matching."],
+    ["seed-resolution", "Resolve and standardize seed ligand", `${input.seed_compound_name || "Seed"} reference resolved for the hosted workspace.`],
+    ["analogue-search", "Retrieve structural analogues", "Reference panel loaded; public services were not queried."],
+    ["standardization", "Standardize and deduplicate candidates", "Reference identities loaded; connect the scientific engine for RDKit computation."],
+    ["medchem-alerts", "Evaluate medicinal-chemistry alerts", "Example review flags displayed; connect the scientific engine for PAINS/Brenk/NIH matching."],
     ["transparent-ranking", "Rank screening candidates", "Five-component chemistry-priority formula displayed."],
     ["docking-readiness", "Check AutoDock Vina prerequisites", "Docking not run; qualified receptor, ligands, box and benchmark are missing."],
     ["procurement-handoff", "Prepare sourcing hand-off", "Chemspace link prepared; no order or availability claim made."],
@@ -584,7 +584,7 @@ function fallbackOpenDiscovery(input: OpenDiscoveryInput): OpenDiscoveryResult {
       evidence_ids: [],
     })),
     evidence: [
-      { evidence_id: "EMB-E01", source_code: "open-targets", source_name: "Open Targets Platform", mode: "link-out", status: "deferred", url: `https://platform.opentargets.org/search?q=${encodeURIComponent(input.disease)}`, statement: "Official search link only; no live data retrieved in hosted fallback.", licence_note: "Preserve evidence provenance and retrieval date.", source_record_id: null, retrieved_at: now },
+      { evidence_id: "EMB-E01", source_code: "open-targets", source_name: "Open Targets Platform", mode: "link-out", status: "deferred", url: `https://platform.opentargets.org/search?q=${encodeURIComponent(input.disease)}`, statement: "Official search link only; no live data retrieved in hosted reference mode.", licence_note: "Preserve evidence provenance and retrieval date.", source_record_id: null, retrieved_at: now },
       { evidence_id: "EMB-E02", source_code: "zinc22", source_name: "ZINC22 / CartBlanche22", mode: "link-out", status: "deferred", url: "https://cartblanche22.docking.org/", statement: "Expansion source registered; no shared service was crawled.", licence_note: "Use approved export or deployment and follow service rules.", source_record_id: null, retrieved_at: now },
       { evidence_id: "EMB-E03", source_code: "chemspace", source_name: "Chemspace", mode: "link-out", status: "available", url: "https://chem-space.com/", statement: "Supplier search hand-off only; availability was not checked.", licence_note: "Current provider terms and API key apply.", source_record_id: null, retrieved_at: now },
     ],
@@ -595,21 +595,21 @@ function fallbackOpenDiscovery(input: OpenDiscoveryInput): OpenDiscoveryResult {
       executable_detected: false,
       receptor_id: input.pdb_id || input.uniprot_accession,
       required_inputs: ["prepared receptor PDBQT", "prepared ligand PDBQT", "validated docking box", "redocking benchmark"],
-      missing_inputs: ["Python worker and Vina executable", "prepared receptor PDBQT", "prepared ligand PDBQT", "validated docking box", "redocking benchmark"],
+      missing_inputs: ["Scientific engine and Vina executable", "prepared receptor PDBQT", "prepared ligand PDBQT", "validated docking box", "redocking benchmark"],
       run_manifest: { execute: false, candidate_count: candidates.length, random_seed: 20260822 },
       result_score_kcal_mol: null,
       scientific_boundary: "No docking score exists. A real Vina result would remain an approximate pose-ranking output, not efficacy evidence.",
     },
     next_actions: [
-      "Connect NEXT_PUBLIC_OSIEL_API_URL to execute the Python/RDKit workflow.",
+      "Connect the scientific engine to execute the RDKit workflow.",
       "Review candidate identity, alert flags and score components with a medicinal chemist.",
       "Resolve and prepare a qualified receptor before any docking run.",
       "Verify supplier, salt, stereochemistry, purity and safety approval before ordering.",
     ],
-    claim_boundary: "This embedded result demonstrates the interface only. It does not predict target binding, efficacy or safety, execute docking, place an order, or perform a laboratory experiment.",
+    claim_boundary: "This reference result illustrates the interface only. It does not predict target binding, efficacy or safety, execute docking, place an order, or perform a laboratory experiment.",
     created_at: now,
     backendConnected: false,
-    modeMessage: "Hosted embedded reference. Configure the Python API to run RDKit and optional official connectors.",
+    modeMessage: "Hosted reference analysis. Connect the scientific engine for RDKit and optional official connectors.",
   };
 }
 
@@ -629,8 +629,8 @@ export async function runOpenDiscovery(input: OpenDiscoveryInput): Promise<OpenD
       ...result,
       backendConnected: true,
       modeMessage: result.execution_mode === "local-python-plus-public-apis"
-        ? "Python/RDKit engine completed with operator-enabled official public APIs."
-        : "Python/RDKit engine completed against the versioned local reference registry.",
+        ? "Research engine completed with operator-enabled official public sources."
+        : "Research engine completed against the versioned local reference registry.",
     };
   } catch {
     return fallbackOpenDiscovery(input);
@@ -723,7 +723,7 @@ export async function runVinaDocking(input: VinaDockingInput): Promise<VinaDocki
     return {
       job: null,
       backendConnected: false,
-      error: "A connected Python API is required for real Vina execution. No score was simulated.",
+      error: "A connected scientific engine is required for real Vina execution. No score was simulated.",
     };
   }
 }
@@ -800,7 +800,7 @@ export async function startZincSearch(input: ZincSearchJob["request"]): Promise<
     }, 45_000);
     return zincResponse(response);
   } catch {
-    return { job: null, backendConnected: false, error: "A connected Python API is required for real ZINC-22 search. No remote results were fabricated." };
+    return { job: null, backendConnected: false, error: "A connected scientific engine is required for real ZINC-22 search. No remote results were fabricated." };
   }
 }
 
@@ -812,7 +812,7 @@ export async function refreshZincSearch(jobId: string): Promise<ZincSearchResult
     }, 45_000);
     return zincResponse(response);
   } catch {
-    return { job: null, backendConnected: false, error: "The Python API could not refresh the remote ZINC-22 task; the task was not resubmitted." };
+    return { job: null, backendConnected: false, error: "The scientific engine could not refresh the remote ZINC-22 task; the task was not resubmitted." };
   }
 }
 
@@ -955,7 +955,7 @@ export async function askScientificProfessor(
     return {
       answer: null,
       backendConnected: false,
-      error: "Python assistant unavailable; the embedded curated guidance is shown instead.",
+      error: "Scientific synthesis unavailable; curated reference guidance is shown instead.",
     };
   }
 }
@@ -1037,7 +1037,7 @@ export async function ingestProfessorDocument(
     }
     return { document: await response.json() as ProfessorDocument, error: null };
   } catch {
-    return { document: null, error: "The Python document-ingestion engine is unavailable." };
+    return { document: null, error: "The document-ingestion service is unavailable." };
   }
 }
 
@@ -1068,7 +1068,7 @@ export async function submitProfessorFeedback(
     const payload = await response.json() as { feedback_id: string };
     return { feedbackId: payload.feedback_id, error: null };
   } catch {
-    return { feedbackId: null, error: "The Python feedback service is unavailable." };
+    return { feedbackId: null, error: "The feedback service is unavailable." };
   }
 }
 
@@ -1196,7 +1196,7 @@ export async function getModelLabCapabilities(): Promise<{ capabilities: ModelLa
     if (!response.ok) return { capabilities: null, backendConnected: true, error: await responseDetail(response) };
     return { capabilities: await response.json() as ModelLabCapabilities, backendConnected: true, error: null };
   } catch {
-    return { capabilities: null, backendConnected: false, error: "Connect the supplied Python API to run the evidence-backed model laboratory." };
+    return { capabilities: null, backendConnected: false, error: "Connect the scientific engine to run the evidence-backed model laboratory." };
   }
 }
 
@@ -1219,7 +1219,7 @@ export async function createChemblSnapshot(input: {
     if (!response.ok) return { snapshot: null, backendConnected: true, error: await responseDetail(response) };
     return { snapshot: await response.json() as ActivityDatasetSnapshot, backendConnected: true, error: null };
   } catch {
-    return { snapshot: null, backendConnected: false, error: "The Python/ChEMBL model-lab service is not connected. No dataset was fabricated." };
+    return { snapshot: null, backendConnected: false, error: "The ChEMBL model-lab service is not connected. No dataset was fabricated." };
   }
 }
 
@@ -1239,7 +1239,7 @@ export async function trainActivityModel(snapshotId: string): Promise<{ run: Act
     if (!response.ok) return { run: null, backendConnected: true, error: await responseDetail(response) };
     return { run: await response.json() as ActivityModelRun, backendConnected: true, error: null };
   } catch {
-    return { run: null, backendConnected: false, error: "The Python model worker is not connected. No evaluation metrics were simulated." };
+    return { run: null, backendConnected: false, error: "The model worker is not connected. No evaluation metrics were simulated." };
   }
 }
 
@@ -1261,7 +1261,7 @@ export async function proposeActiveLearning(
     if (!response.ok) return { batch: null, backendConnected: true, error: await responseDetail(response) };
     return { batch: await response.json() as ActiveLearningBatch, backendConnected: true, error: null };
   } catch {
-    return { batch: null, backendConnected: false, error: "The Python active-learning service is not connected. No priorities were fabricated." };
+    return { batch: null, backendConnected: false, error: "The active-learning service is not connected. No priorities were fabricated." };
   }
 }
 
@@ -1303,7 +1303,7 @@ export async function runDockingBenchmark(input: {
     if (!response.ok) return { benchmark: null, backendConnected: true, error: await responseDetail(response) };
     return { benchmark: await response.json() as DockingBenchmarkRun, backendConnected: true, error: null };
   } catch {
-    return { benchmark: null, backendConnected: false, error: "The Python benchmark service is not connected. No RMSD was simulated." };
+    return { benchmark: null, backendConnected: false, error: "The benchmark service is not connected. No RMSD was simulated." };
   }
 }
 
@@ -1380,7 +1380,7 @@ export async function runMultimodalResearchCase(input: {
     return {
       result: null,
       backendConnected: false,
-      error: "The Python multimodal orchestrator is not connected. OSIEL stopped safely and generated no scientific conclusion.",
+      error: "The multimodal service is not connected. OSIEL stopped safely and generated no scientific conclusion.",
     };
   }
 }

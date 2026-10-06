@@ -162,7 +162,7 @@ export function OpenDiscoveryWorkspace() {
 
     {result && <>
       <section className={`od-run-banner ${result.backendConnected ? "live" : "fixture"}`}>
-        <div><i/><span>{result.backendConnected ? "PYTHON ENGINE" : "EMBEDDED UI REFERENCE"}</span><b>{result.modeMessage}</b></div>
+        <div><i/><span>{result.backendConnected ? "RESEARCH ENGINE" : "REFERENCE WORKSPACE"}</span><b>{result.modeMessage}</b></div>
         <div><span>Run ID</span><code>{result.run_id}</code></div>
         <div><span>Status</span><b>{statusLabel(result.status)}</b></div>
         <div><span>Docking</span><b>No score · {result.docking.status}</b></div>

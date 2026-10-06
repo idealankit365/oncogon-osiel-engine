@@ -90,7 +90,7 @@ export default function Home() {
   const [rankingRunId, setRankingRunId] = useState("RNK-EMBEDDED-DEMO");
   const [engineState, setEngineState] = useState<"ready" | "running" | "complete">("ready");
   const [backendConnected, setBackendConnected] = useState(false);
-  const [engineMessage, setEngineMessage] = useState("Embedded deterministic reference workspace ready.");
+  const [engineMessage, setEngineMessage] = useState("Research workspace ready.");
   const [detailTab, setDetailTab] = useState<"overview" | "evidence" | "admet">("overview");
   const [experiment, setExperiment] = useState<DryRunResult | null>(null);
   const [experimentStage, setExperimentStage] = useState(-1);
@@ -150,7 +150,7 @@ export default function Home() {
         <nav className="side-nav">
           {navGroups.map((group) => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map(([icon, label]) => <button key={label} className={activeNav === label ? "active" : ""} onClick={() => { setActiveNav(label); setSidebarOpen(false); }}><Icon name={icon as IconName}/><span>{label}</span>{label === "Experiments" && <i>3</i>}</button>)}</div>)}
         </nav>
-        <div className="sidebar-foot"><div className="model-status"><span className="pulse"/><div><b>Champion online</b><small>osiel-demo-activity@0.1</small></div></div><button onClick={() => setActiveNav("Settings")}><Icon name="settings"/><span>Workspace settings</span></button><p>Research use only · v0.1.0</p></div>
+        <div className="sidebar-foot"><div className="model-status"><span className="pulse"/><div><b>Activity Model Ready</b><small>OSIEL Activity Model v0.1</small></div></div><button onClick={() => setActiveNav("Settings")}><Icon name="settings"/><span>Workspace settings</span></button><p>Research use only · v0.1.0</p></div>
       </aside>
 
       <main className="main-area">
@@ -158,7 +158,7 @@ export default function Home() {
           <button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation"><Icon name="menu"/></button>
           <div className="breadcrumb"><span>OSIEL</span><Icon name="chevron" size={13}/><b>{activeNav}</b></div>
           <label className="global-search"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search compounds, IDs, evidence…"/><kbd>⌘ K</kbd></label>
-          <div className="top-actions"><button aria-label="Notifications"><Icon name="bell"/></button><div className={`connection ${backendConnected ? "live" : "demo"}`}><span/>{backendConnected ? "Python API live" : "Embedded demo"}</div><div className="avatar small">DR</div></div>
+          <div className="top-actions"><button aria-label="Notifications"><Icon name="bell"/></button><div className={`connection ${backendConnected ? "live" : "demo"}`}><span/>{backendConnected ? "Research Engine Active" : "OSIEL Research Workspace"}</div><div className="avatar small">DR</div></div>
         </header>
 
         <div className="page-content">
@@ -185,7 +185,7 @@ export default function Home() {
               <label><span>Endpoint</span><select defaultValue="activity_probability"><option value="activity_probability">Activity probability</option><option value="IC50">IC50 (separate task)</option><option value="GI50">GI50 (separate task)</option></select></label>
               <div className="segmented-field"><span>Candidate origin</span><div>{(["all", "natural", "synthetic"] as const).map((value) => <button key={value} className={origin === value ? "active" : ""} onClick={() => setOrigin(value)}>{value === "all" ? "All" : value[0].toUpperCase() + value.slice(1)}</button>)}</div></div>
             </div>
-            <div className="context-meta"><span><i className="dot green"/> Task <b>OSIEL-ACTIVITY-NSCLC-v1</b></span><span>Split: <b>scaffold-safe</b></span><span>Policy: <b>rank-policy@1.0</b></span><span>Updated: <b>deterministic demo</b></span></div>
+            <div className="context-meta"><span><i className="dot green"/> Task <b>OSIEL-ACTIVITY-NSCLC-v1</b></span><span>Split: <b>scaffold-safe</b></span><span>Policy: <b>rank-policy@1.0</b></span><span>Updated: <b>Reference Analysis</b></span></div>
           </section>
 
           <section className="metrics-grid">
@@ -231,7 +231,7 @@ export default function Home() {
               <div className="detail-tabs">{(["overview", "evidence", "admet"] as const).map((tab) => <button key={tab} className={detailTab === tab ? "active" : ""} onClick={() => setDetailTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}</div>
               {detailTab === "overview" && <div className="detail-panel"><div className="prediction-callout"><span>Predicted IC50</span><strong>{focused.predicted_ic50_um.toFixed(2)} <small>µM</small></strong><Badge tone={focused.confidence >= 75 ? "mint" : "amber"}>{focused.confidence}% confidence</Badge></div><ScoreBar label="Predicted activity" value={focused.activity}/><ScoreBar label="Selectivity" value={focused.selectivity} tone="cyan"/><ScoreBar label="Model confidence" value={focused.confidence} tone="mint"/><div className="detail-note"><Icon name="robot"/><p>{focused.note}</p></div></div>}
               {detailTab === "evidence" && <div className="detail-panel"><div className="evidence-grade"><b>{focused.evidence_grade}</b><div><span>Evidence grade</span><strong>{focused.evidence_grade === "A" ? "Curated reference" : focused.evidence_grade === "B" ? "Verified identity" : "Limited context"}</strong></div></div><dl className="evidence-list"><div><dt>Source</dt><dd>{focused.source}</dd></div><div><dt>Model domain</dt><dd>{focused.applicability_domain}</dd></div><div><dt>Uncertainty</dt><dd>{focused.uncertainty}%</dd></div><div><dt>Claim type</dt><dd>In-silico hypothesis</dd></div></dl><button className="wide-secondary"><Icon name="book"/> Inspect lineage record</button></div>}
-              {detailTab === "admet" && <div className="detail-panel admet-list">{focused.admet.map((endpoint) => <div key={endpoint.code}><div className={`admet-symbol ${endpoint.className}`}>{endpoint.label[0]}</div><div><span>{endpoint.label}</span><b>{endpoint.value}/100</b></div><Badge tone={endpoint.className === "good" ? "mint" : endpoint.className === "risk" ? "red" : "amber"}>{endpoint.className}</Badge></div>)}<p>Rule-based demo endpoints are separate estimates. Production adapters target ADMET-AI or validated endpoint models.</p></div>}
+              {detailTab === "admet" && <div className="detail-panel admet-list">{focused.admet.map((endpoint) => <div key={endpoint.code}><div className={`admet-symbol ${endpoint.className}`}>{endpoint.label[0]}</div><div><span>{endpoint.label}</span><b>{endpoint.value}/100</b></div><Badge tone={endpoint.className === "good" ? "mint" : endpoint.className === "risk" ? "red" : "amber"}>{endpoint.className}</Badge></div>)}<p>Rule-based research endpoints are separate estimates. Production adapters target ADMET-AI or validated endpoint models.</p></div>}
             </aside>
           </section>
 
@@ -246,14 +246,14 @@ export default function Home() {
 
             <article className="governance-card card">
               <div className="section-heading"><div><span>MODEL GOVERNANCE</span><h2>Champion / challenger gate</h2></div><Icon name="shield"/></div>
-              <div className="model-row champion"><div className="model-badge"><Icon name="check"/></div><div><span>CHAMPION</span><b>osiel-demo-activity@0.1</b><small>Approved reference · 2026-08-19</small></div><Badge tone="mint">Online</Badge></div>
+              <div className="model-row champion"><div className="model-badge"><Icon name="check"/></div><div><span>CHAMPION</span><b>OSIEL Activity Model v0.1</b><small>Approved reference · 2026-08-19</small></div><Badge tone="mint">Online</Badge></div>
               <div className="model-divider"><span>Evaluation boundary</span></div>
               <div className="model-row"><div className="model-badge challenger"><Icon name="activity"/></div><div><span>CHALLENGER</span><b>Awaiting approved dataset</b><small>Training never starts from a UI upload</small></div><Badge>Locked</Badge></div>
               <ul className="gate-list"><li><Icon name="check"/> Scientific result approval required</li><li><Icon name="check"/> Immutable snapshot and leakage audit</li><li><Icon name="check"/> Independent evaluation and named reviewer</li></ul>
             </article>
           </section>
 
-          <footer className="page-footer"><div><strong>OSIEL</strong> · Oncogon Scientific Intelligence & Experimental Learning Engine</div><div>Developer reference v0.1.0 <span/> Research use only</div></footer>
+          <footer className="page-footer"><div><strong>OSIEL</strong> · Oncogon Scientific Intelligence & Experimental Learning Engine</div><div>Research workspace v0.1.0 <span/> Research use only</div></footer>
           </>}
         </div>
       </main>

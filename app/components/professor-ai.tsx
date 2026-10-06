@@ -197,8 +197,8 @@ export function ProfessorAI({
     : serverAnswer?.mode === "local-ollama-rag"
       ? `Local ${serverAnswer.model || "Qwen"} · curated cited RAG`
       : serverAnswer
-        ? "Python evidence gate · abstaining fallback"
-        : "Embedded guidance · connect Python for RAG";
+        ? "Evidence review · no supported synthesis"
+        : "Curated guidance · research synthesis requires the scientific engine";
 
   return <>
     <section className="module-heading">
@@ -266,7 +266,7 @@ export function ProfessorAI({
         {serverAnswer ? <div className="professor-sources"><b>Retrieved evidence · open and verify the original</b>{serverAnswer.evidence.map((source) => {
           const label = `${source.evidence_id}${source.page_number ? ` · page ${source.page_number}` : ""} · ${source.title || source.display_name || source.source || "source"}`;
           return <div className={`professor-citation ${source.used_by_model ? "used" : ""}`} key={source.evidence_id}>{source.url ? <a href={source.url} target="_blank" rel="noreferrer">{label} ↗</a> : <span>{label}</span>}{source.quote && <small>{source.quote}</small>}<em>{source.used_by_model ? "Cited by model" : "Retrieved context"}{source.retrieval_score !== undefined ? ` · ${Math.round(source.retrieval_score * 100)}%` : ""}</em></div>;
-        })}</div> : <div className="professor-sources"><b>Embedded sources used</b>{topic.sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.label} ↗</a>)}</div>}
+        })}</div> : <div className="professor-sources"><b>Curated sources used</b>{topic.sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.label} ↗</a>)}</div>}
 
         {serverAnswer?.retrieval_trace.length ? <details className="professor-trace" open><summary>Visible execution trace · {serverAnswer.retrieval_trace.length} stages</summary>{serverAnswer.retrieval_trace.map((event, index) => <div key={`${event.stage}-${index}`}><i className={event.status} /><span><b>{event.stage}</b>{event.message}</span><em>{event.status}</em></div>)}</details> : null}
         {serverAnswer?.warnings.map((warning) => <div className="professor-warning" key={warning}>{warning}</div>)}

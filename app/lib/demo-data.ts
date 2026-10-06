@@ -39,7 +39,7 @@ export const demoCandidates: RankedCandidate[] = [
     predicted_ic50_um: 2.47,
     evidence_grade: "B",
     applicability_domain: "inside",
-    source: "PubChem identity · OSIEL demo hypothesis",
+    source: "PubChem identity · OSIEL reference hypothesis",
     note: "High activity signal with a balanced rule-based developability panel.",
     admet: [
       { code: "sol", label: "Solubility", value: 72, className: "good" },
@@ -62,7 +62,7 @@ export const demoCandidates: RankedCandidate[] = [
     predicted_ic50_um: 3.12,
     evidence_grade: "B",
     applicability_domain: "inside",
-    source: "PubChem identity · OSIEL demo hypothesis",
+    source: "PubChem identity · OSIEL reference hypothesis",
     note: "Close activity/selectivity balance; structural redundancy requires review.",
     admet: [
       { code: "sol", label: "Solubility", value: 69, className: "watch" },
@@ -108,7 +108,7 @@ export const demoCandidates: RankedCandidate[] = [
     predicted_ic50_um: 4.64,
     evidence_grade: "B",
     applicability_domain: "borderline",
-    source: "PubChem identity · OSIEL demo hypothesis",
+    source: "PubChem identity · OSIEL reference hypothesis",
     note: "Promising signal with higher uncertainty and a solubility watch flag.",
     admet: [
       { code: "sol", label: "Solubility", value: 38, className: "risk" },
@@ -131,7 +131,7 @@ export const demoCandidates: RankedCandidate[] = [
     predicted_ic50_um: 5.87,
     evidence_grade: "B",
     applicability_domain: "inside",
-    source: "PubChem identity · OSIEL demo hypothesis",
+    source: "PubChem identity · OSIEL reference hypothesis",
     note: "Moderate predicted activity; retained for chemical diversity.",
     admet: [
       { code: "sol", label: "Solubility", value: 76, className: "good" },
@@ -177,7 +177,7 @@ export const demoCandidates: RankedCandidate[] = [
     predicted_ic50_um: 8.21,
     evidence_grade: "C",
     applicability_domain: "borderline",
-    source: "PubChem identity · OSIEL demo hypothesis",
+    source: "PubChem identity · OSIEL reference hypothesis",
     note: "Uncertainty penalty dominates; suited to an information-gain experiment.",
     admet: [
       { code: "sol", label: "Solubility", value: 44, className: "risk" },
@@ -201,7 +201,7 @@ export const demoCandidates: RankedCandidate[] = [
     evidence_grade: "D",
     applicability_domain: "outside",
     source: "RDKit NCI structural reference set",
-    note: "Outside the demo applicability domain; flagged, not discarded silently.",
+    note: "Outside the reference applicability domain; flagged, not discarded silently.",
     admet: [
       { code: "sol", label: "Solubility", value: 49, className: "risk" },
       { code: "perm", label: "Permeability", value: 68, className: "watch" },
